@@ -90,9 +90,11 @@ CTBModule::do_configure(const data_t& args)
   //nlohmann::json jblob;
   //json_stream >> jblob;
 
+  nlohmann::json conf_json = nlohmann::json::parse(m_cfg.board_config);
+
   // get the receiver port from the json
-  const unsigned int receiver_port = m_cfg.board_config["ctb"]["sockets"]["receiver"]["port"];
-  m_rollover = m_cfg.board_config["ctb"]["sockets"]["receiver"]["rollover"];
+  const unsigned int receiver_port = conf_json["ctb"]["sockets"]["receiver"]["port"];
+  m_rollover = conf_json["ctb"]["sockets"]["receiver"]["rollover"];
   const unsigned int timeout_scaling = m_cfg.receiver_timeout_scaling;
   const unsigned int timeout = m_rollover / 50 / timeout_scaling; //microseconds
 
@@ -116,13 +118,13 @@ CTBModule::do_configure(const data_t& args)
   // with the receiver host which is the machines where the board reader is running
 
   const std::string receiver_address = boost::asio::ip::host_name() ;
-  m_cfg.board_config["ctb"]["sockets"]["receiver"]["host"] = receiver_address ;
+  conf_json["ctb"]["sockets"]["receiver"]["host"] = receiver_address ;
   TLOG() << get_name() << "Board packages receved at " << receiver_address << ':' << receiver_port << std::endl;
 
   // create the json string
-  std::string config = m_cfg.board_config.get<std::string>();
+  //std::string config = m_cfg.board_config.get<std::string>();
 
-  send_config(config);
+  send_config(m_cfg.board_config);
 
 }
 
