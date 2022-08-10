@@ -72,8 +72,8 @@ local ctbmodule = {
     ], doc="Central Trigger Board Timing Configuration"),
 
     misc: s.record("Misc",  [
-        s.field("randomtrigger_1", self.randomtrigger),
-        s.field("randomtrigger_2", self.randomtrigger),
+        s.field("randomtrigger_1", self.randomtrigger, self.randomtrigger),
+        s.field("randomtrigger_2", self.randomtrigger, self.randomtrigger),
         s.field("pulser", self.pulser, self.pulser),
         s.field("timing", self.timing, self.timing),
         s.field("ch_status", self.boolean, false),
@@ -97,11 +97,11 @@ local ctbmodule = {
         s.field("prescale", self.string, "0x1"),
     ], doc="Central Trigger Board HLT Command HLT Trigger Configuration"),
 
-    hlt_trigger_seq: s.sequence("Hlt_trigger_seq", self.hlt_trigger, doc="Central Trigger Board HLT Trigger Sequence Configuration"),
+    hlt_trigger_seq: s.sequence("Hlt_trigger_seq", self.hlt_trigger,  doc="Central Trigger Board HLT Trigger Sequence Configuration"),
 
     hlt: s.record("Hlt",  [
         s.field("command_mask", self.command_mask, self.command_mask),
-        s.field("trigger", self.hlt_trigger_seq),
+        s.field("trigger", self.hlt_trigger_seq, [self.hlt_trigger]),
     ], doc="Central Trigger Board HLT Configuration"),
 
     llt_trigger: s.record("Llt_trigger",  [
@@ -129,23 +129,24 @@ local ctbmodule = {
         s.field("reshape_length", self.uint8, 5),
         s.field("delays", self.string, ":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]"),
         s.field("dac_thresholds", self.string, ":[2185,2194,2170,2176,2167,2200,2179,2197,2188,2179,2185,2191,2176,2182,2191,2182,2176,2173,2200,2185,2182,2176,2191,2167]"),
-        s.field("triggers", self.llt_trigger_seq),
+        s.field("triggers", self.llt_trigger_seq, [self.llt_trigger]),
     ], doc="Central Trigger Board PDF Subsystem Configuration"),
 
     crt: s.record("Crt",  [
         s.field("channel_mask", self.string, "0xFFFFFFFF"),
-        s.field("pixelate", self.string, true),
+        s.field("pixelate", self.boolean, true),
         s.field("reshape_length", self.uint8, 5),
         s.field("delays", self.string, ":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]"),
-        s.field("triggers", self.llt_trigger_seq),
+        s.field("triggers", self.llt_trigger_seq, [self.llt_trigger]),
     ], doc="Central Trigger Board CRT Subsystem Configuration"),
 
     beam: s.record("Beam",  [
         s.field("channel_mask", self.string, "0x17FB"),
         s.field("reshape_length", self.uint8, 50),
         s.field("delays", self.string, ":[1,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0]"),
-        s.field("triggers", self.llt_trigger_red_seq),
+        s.field("triggers", self.llt_trigger_red_seq, [self.llt_trigger]),
     ], doc="Central Trigger Board Beam Subsystem Configuration"),
+
 
     subsystems: s.record("Subsystems",  [
         s.field("pds", self.pds, self.pds),

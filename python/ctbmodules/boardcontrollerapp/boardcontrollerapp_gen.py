@@ -1,5 +1,5 @@
 # This module facilitates the generation of FLX card controller apps
-
+from rich.console import Console
 # Set moo schema search path
 from dunedaq.env import get_moo_model_path
 import moo.io
@@ -23,17 +23,20 @@ def get_boardcontroller_app(
     '''
     Here an entire application controlling one CTB board is generated. 
     '''
+    console = Console()
 
     # Define modules
 
     modules = []
     lus = []
     # Prepare standard config with no additional configuration
+    console.log('generating DAQ module')
     modules += [DAQModule(name = nickname, 
                           plugin = 'CTBModule',
                           conf = ctb.Conf()
                              )]
 
+    console.log('generated DAQ module')
     mgraph = ModuleGraph(modules)
     ctb_app = App(modulegraph=mgraph, name=nickname)
 

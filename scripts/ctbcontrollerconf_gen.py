@@ -75,9 +75,12 @@ def cli(opmon_impl, ers_impl, pocket_url, image, use_k8s, json_dir):
 
 
     nickname = 'ctb'
+    console.log('generating cardcontrollerapp')
+
     app = boardcontrollerapp_gen.get_boardcontroller_app(
         nickname = nickname,
     )
+    console.log('generated cardcontrollerapp')
     the_system.apps[nickname] = app
     if use_k8s:
         the_system.apps[nickname].resources = {
