@@ -48,14 +48,12 @@ local ctbmodule = {
         s.field("statistics", self.statistics, self.statistics),
      ], doc="Central Trigger Board Sockets Configuration"),
 
-
     randomtrigger: s.record("Randomtrigger",  [
-        s.field("description", self.string, ""),
+        s.field("description", self.string, "Random trigger that can optionally be set to fire only during beam spill"),
         s.field("enable", self.boolean, false),
-        s.field("fixed_freq", self.boolean, false),
-        s.field("beam_mode", self.boolean, false),
-        s.field("period", self.uint8, 0),
-        s.field("standalone_enable", self.boolean, true),
+        s.field("fixed_freq", self.boolean, true),
+        s.field("beam_mode", self.boolean, true),
+        s.field("period", self.uint8, 100000),
     ], doc="Central Trigger Board Random Trigger Configuration"),
 
 

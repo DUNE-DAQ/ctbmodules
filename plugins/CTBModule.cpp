@@ -42,6 +42,7 @@ CTBModule::CTBModule(const std::string& name)
   , thread_(std::bind(&CTBModule::do_work, this, std::placeholders::_1))
   , m_has_calibration_stream( false )
 {
+  register_command("conf", &CTBModule::do_configure);
   register_command("start", &CTBModule::do_start);
   register_command("stop", &CTBModule::do_stop);
 }
@@ -124,7 +125,7 @@ CTBModule::do_configure(const data_t& args)
   // create the json string
   nlohmann::json config;
   to_json(config, m_cfg.board_config);
- 
+  TLOG() << "CONF TEST: " << config.dump();
   send_config(config.dump());
 
 }
