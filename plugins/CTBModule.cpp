@@ -42,6 +42,7 @@ CTBModule::CTBModule(const std::string& name)
   , thread_(std::bind(&CTBModule::do_work, this, std::placeholders::_1))
   , m_has_calibration_stream( false )
 {
+  register_command("conf", &CTBModule::do_configure);
   register_command("start", &CTBModule::do_start);
   register_command("stop", &CTBModule::do_stop);
 }
@@ -69,9 +70,7 @@ CTBModule::do_configure(const data_t& args)
 {
   m_cfg = args.get<ctbmodule::Conf>();
   m_receiver_port = m_cfg.receiver_connection_port;  
-  m_timeout = std::chrono::microseconds(m_cfg.receiver_connection_timeout); //10
   m_buffer_size = m_cfg.buffer_size; //5000
-  const std::string config = "";
 
   // Initialise monitoring variables
   m_num_control_messages_sent = 0;
@@ -86,7 +85,48 @@ CTBModule::do_configure(const data_t& args)
   //shoudl we put this into a try?
   m_control_socket.connect( m_endpoint );
 
-  send_config(config);
+  // prepare the receiver
+  // get the json configuration string
+  //std::stringstream json_stream(static_cast<nlohmann::json>(m_cfg.board_config)) ;
+  //nlohmann::json jblob;
+  //json_stream >> jblob;
+
+  //nlohmann::json conf_json = nlohmann::json::parse(m_cfg.board_config);
+
+  // get the receiver port from the json
+  const unsigned int receiver_port = m_cfg.board_config.ctb.sockets.receiver.port;
+  m_rollover = m_cfg.board_config.ctb.sockets.receiver.rollover;
+  const unsigned int timeout_scaling = m_cfg.receiver_timeout_scaling;
+  const unsigned int timeout = m_rollover / 50 / timeout_scaling; //microseconds
+
+  //                                      |-> this is the board clock frequency which is 50 MHz
+  m_timeout = std::chrono::microseconds( timeout ) ;
+  // if necessary, set the calibration stream
+
+  if ( m_cfg.calibration_stream_output != "")  {
+    m_has_calibration_stream = true ; 
+    m_calibration_dir = m_cfg.calibration_stream_output ;
+    m_calibration_file_interval = std::chrono::minutes(m_cfg.calibration_update); 
+  }
+
+  if ( m_cfg.run_trigger_output != "" ) {
+    m_has_run_trigger_report = true ; 
+    m_run_trigger_dir = m_cfg.run_trigger_output;
+    if ( m_run_trigger_dir.back() != '/' ) m_run_trigger_dir += '/' ;
+  }
+
+  // complete the json configuration
+  // with the receiver host which is the machines where the board reader is running
+
+  const std::string receiver_address = boost::asio::ip::host_name() ;
+  m_cfg.board_config.ctb.sockets.receiver.host = receiver_address ;
+  TLOG() << get_name() << ": Board packages receved at " << receiver_address << ':' << receiver_port << std::endl;
+
+  // create the json string
+  nlohmann::json config;
+  to_json(config, m_cfg.board_config);
+  //TLOG() << "CONF TEST: " << config.dump();
+  send_config(config.dump());
 
 }
 
@@ -96,11 +136,19 @@ CTBModule::do_start(const nlohmann::json& /*startobj*/)
 
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering do_start() method";
 
-  TLOG() << get_name() << "Sending start of run command";
+  TLOG() << get_name() << ": Sending start of run command";
+
+  if ( m_has_calibration_stream ) {
+    std::stringstream run;
+    run << "run" << 91919191;//run_number();
+    SetCalibrationStream(run.str()) ;
+  }
+
+
 
   if ( send_message( "{\"command\":\"StartRun\"}" )  ) {
     m_is_running.store(true);
-    TLOG() << get_name() << " successfully started";
+    TLOG() << get_name() << ": successfully started";
   }
   else{
     ers::error(CTBCommunicationError(ERS_HERE, "Unable to start CTB"));
@@ -115,16 +163,17 @@ CTBModule::do_stop(const nlohmann::json& /*stopobj*/)
 
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering do_stop() method";
 
-  TLOG() << get_name() << "Sending stop run command" << std::endl;
+  TLOG() << get_name() << ": Sending stop run command" << std::endl;
 
   if(send_message( "{\"command\":\"StopRun\"}" ) ){
-    TLOG() << get_name() << " successfully stopped";
+    TLOG() << get_name() << ": successfully stopped";
 
     m_is_running.store( false ) ;
   }
   else{
     ers::error(CTBCommunicationError(ERS_HERE, "Unable to stop CTB"));
   }
+  store_run_trigger_counters( 91919191 ) ; 
 
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Exiting do_stop() method";
 }
@@ -143,11 +192,11 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
   // the raw buffer can contain 4 times the maximum TCP package size, which is 4 KB
   boost::lockfree::spsc_queue< content::word::word_t > word_buffer(m_buffer_size);
 
-  TLOG() << get_name() <<  "Header size: " << header_size << std::endl << "Word size: " << word_size << std::endl;
+  TLOG() << get_name() <<  ": Header size: " << header_size << std::endl << "Word size: " << word_size << std::endl;
 
   //connect to socket
   boost::asio::ip::tcp::acceptor acceptor(m_receiver_ios, boost::asio::ip::tcp::endpoint( boost::asio::ip::tcp::v4(), m_receiver_port ) );
-  TLOG() << get_name() << "Waiting for an incoming connection on port " << m_receiver_port << std::endl;
+  TLOG() << get_name() << ": Waiting for an incoming connection on port " << m_receiver_port << std::endl;
 
   std::future<void> accepting = async( std::launch::async, [&]{ acceptor.accept(m_receiver_socket) ; } ) ;
 
@@ -157,7 +206,7 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
     }
   }
 
-  TLOG() << get_name() <<  "Connection received: start reading" << std::endl;
+  TLOG() << get_name() <<  ": Connection received: start reading" << std::endl;
 
   content::tcp_header_t head ;
   head.packet_size = 0;
@@ -203,7 +252,7 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
       else if ( IsFeedbackWord( temp_word ) ) {
         m_error_state.store( true ) ;
         content::word::feedback_t * feedback = reinterpret_cast<content::word::feedback_t*>( & temp_word ) ;
-        TLOG() << get_name() << "Feedback word: " << std::endl
+        TLOG() << get_name() << ": Feedback word: " << std::endl
                                                   << std::hex 
                                                   << " \t Type -> " << feedback -> word_type << std::endl 
                                                   << " \t TS -> " << feedback -> timestamp << std::endl
@@ -265,14 +314,14 @@ bool CTBModule::read( T &obj) {
   }
 
   if ( receiving_error == boost::asio::error::eof) {
-    TLOG() << get_name() <<  "Socket closed: "<< receiving_error.message()  << std::endl ;
+    TLOG() << get_name() <<  ": Socket closed: "<< receiving_error.message()  << std::endl ;
     return false ;
   }
 
   
 
   if ( receiving_error ) {
-    TLOG() << get_name() << "Read failure: " << receiving_error.message() << std::endl ;
+    TLOG() << get_name() << ": Read failure: " << receiving_error.message() << std::endl ;
     return false ;
   }
 
@@ -314,15 +363,12 @@ void CTBModule::init_calibration_file() {
   m_last_calibration_file_update = std::chrono::steady_clock::now();
   // _calibration_file.setf ( std::ios::hex, std::ios::basefield );
   // _calibration_file.unsetf ( std::ios::showbase );
-  TLOG() << get_name() << "New Calibration Stream file: " << global_name << std::endl ;
+  TLOG() << get_name() << ": New Calibration Stream file: " << global_name << std::endl ;
 
 }
 
-bool CTBModule::SetCalibrationStream( const std::string & string_dir,
-                                         const std::chrono::minutes & interval, 
-                                         const std::string & prefix ) {
+bool CTBModule::SetCalibrationStream( const std::string & prefix ) {
 
-  m_calibration_dir = string_dir ;
   if ( m_calibration_dir.back() != '/' ){
     m_calibration_dir += '/' ;
   }
@@ -330,22 +376,42 @@ bool CTBModule::SetCalibrationStream( const std::string & string_dir,
   if ( prefix.size() > 0 ){ 
     m_calibration_prefix += '_' ;
   } 
-  m_calibration_file_interval = interval ;
   // possibly we could check here if the directory is valid and  writable before assuming the calibration stream is valid
-  return m_has_calibration_stream = true ;
+  return true ;
 
 }
+
+bool CTBModule::store_run_trigger_counters( unsigned int run_number, const std::string & prefix) const {
+
+  if ( ! m_has_run_trigger_report ) {
+    return false ;
+  }
+
+  std::stringstream out_name ;
+  out_name << m_run_trigger_dir << prefix << "run_" << run_number << "_triggers.txt";
+  std::ofstream out( out_name.str() ) ;
+  out << "Good Part\t " << m_run_gool_part_counter << std::endl 
+      << "Total HLT\t " << m_run_HLT_counter << std::endl ;
+
+  for ( unsigned int i = 0; i < m_metric_HLT_names.size() ; ++i ) {
+    out << "HLT " << i << " \t " << m_run_HLT_counters[i] << std::endl ;
+  }
+
+  return true; 
+
+}
+
 
 void CTBModule::send_config( const std::string & config ) {
 
   if ( m_is_configured.load() ) {
 
-    TLOG() << get_name() << "Resetting before configuring" << std::endl;
+    TLOG() << get_name() << ": Resetting before configuring" << std::endl;
     send_reset();
 
   }
 
-  TLOG() << get_name() << "Sending config" << std::endl;
+  TLOG() << get_name() << ": Sending config" << std::endl;
 
   if ( send_message( config ) ) {
 
@@ -359,7 +425,7 @@ void CTBModule::send_config( const std::string & config ) {
 
 void CTBModule::send_reset() {
 
-  TLOG() << get_name() << "Sending a reset" << std::endl;
+  TLOG() << get_name() << ": Sending a reset" << std::endl;
 
   if(send_message( "{\"command\":\"HardReset\"}" )){
 
@@ -378,7 +444,7 @@ bool CTBModule::send_message( const std::string & msg ) {
   //add error options                                                                                                
 
   boost::system::error_code error;
-  TLOG() << get_name() << "Sending message: " << msg;
+  TLOG() << get_name() << ": Sending message: " << msg;
 
   m_num_control_messages_sent++;
 
@@ -386,12 +452,12 @@ bool CTBModule::send_message( const std::string & msg ) {
   boost::array<char, 1024> reply_buf{" "} ;
   m_control_socket.read_some( boost::asio::buffer(reply_buf ), error);
   std::stringstream raw_answer( std::string(reply_buf .begin(), reply_buf .end() ) ) ;
-  TLOG() << get_name() << "Unformatted answer: " << raw_answer.str(); 
+  TLOG() << get_name() << ": Unformatted answer: " << raw_answer.str(); 
 
   nlohmann::json answer ;
   raw_answer >> answer ;
   nlohmann::json & messages = answer["feedback"] ;
-  TLOG() << get_name() << "Received messages: " << messages.size();
+  TLOG() << get_name() << ": Received messages: " << messages.size();
 
   bool ret = true ;
   for (nlohmann::json::size_type i = 0; i != messages.size(); ++i ) {
@@ -400,19 +466,19 @@ bool CTBModule::send_message( const std::string & msg ) {
 
     std::string type = messages[i]["type"].dump() ;
     if ( type.find("error") != std::string::npos || type.find("Error") != std::string::npos || type.find("ERROR") != std::string::npos ) {
-      TLOG() << get_name() << "Error from the Board: " << messages[i]["message"].dump();
+      TLOG() << get_name() << ": Error from the Board: " << messages[i]["message"].dump();
       ret = false ;
     }
     else if ( type.find("warning") != std::string::npos || type.find("Warning") != std::string::npos || type.find("WARNING") != std::string::npos ) {
-      TLOG() << get_name() << "Warning from the Board: " << messages[i]["message"].dump();
+      TLOG() << get_name() << ": Warning from the Board: " << messages[i]["message"].dump();
     }
     else if ( type.find("info") != std::string::npos || type.find("Info") != std::string::npos || type.find("INFO") != std::string::npos) {
-      TLOG() << get_name() << "Info from the board: " << messages[i]["message"].dump();
+      TLOG() << get_name() << ": Info from the board: " << messages[i]["message"].dump();
     }
     else {
       std::stringstream blob;
       blob << messages[i] ;
-      TLOG() << get_name() << "Unformatted from the board: " << blob.str();
+      TLOG() << get_name() << ": Unformatted from the board: " << blob.str();
     }
   }
 

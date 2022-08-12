@@ -56,10 +56,6 @@ public:
 
   void init(const nlohmann::json& iniobj) override;
 
-  bool SetCalibrationStream( const std::string &string_dir, 
-                             const std::chrono::minutes &interval, 
-                             const std::string &prefix = "" );
-
   static bool IsTSWord( const content::word::word_t &w ) noexcept;
   static bool IsFeedbackWord( const content::word::word_t &w ) noexcept;
   bool ErrorState() const { return m_error_state.load() ; } 
@@ -78,6 +74,7 @@ private:
   std::atomic<unsigned int> m_n_TS_words;
   std::atomic<bool> m_error_state;
   unsigned int m_buffer_size;
+  unsigned int m_rollover;
 
   boost::asio::io_service m_control_ios;
   boost::asio::io_service m_receiver_ios;
@@ -108,19 +105,41 @@ private:
 
   void update_calibration_file();
   void init_calibration_file();
+  bool SetCalibrationStream( const std::string &prefix = "" );
 
-
-  bool m_has_calibration_stream; 
-  std::string m_calibration_dir; 
-  std::string m_calibration_prefix; 
+  bool m_has_calibration_stream = false; 
+  std::string m_calibration_dir = ""; 
+  std::string m_calibration_prefix = ""; 
   std::chrono::minutes m_calibration_file_interval;  
   std::ofstream m_calibration_file;
   std::chrono::steady_clock::time_point m_last_calibration_file_update;
 
+  // members related to run trigger report
+
+  bool m_has_run_trigger_report = false;
+  std::string m_run_trigger_dir = "";
+  bool store_run_trigger_counters( unsigned int run_number, const std::string & prefix = "" ) const;
+
+
+  unsigned long m_run_gool_part_counter = 0;
+  unsigned long m_run_HLT_counter = 0;
+  unsigned long m_run_HLT_counters[8] = {0};
+
+  // metric utilities
+
+  const std::array<std::string, 8> m_metric_HLT_names  = { "CTB_HLT_0_rate",
+                                                            "CTB_HLT_1_rate", 
+                                                            "CTB_HLT_2_rate",
+                                                            "CTB_HLT_3_rate",
+                                                            "CTB_HLT_4_rate",
+                                                            "CTB_HLT_5_rate",
+                                                            "CTB_HLT_6_rate",
+                                                            "CTB_HLT_7_rate" };
+
   // monitoring
 
-  int m_num_control_messages_sent;
-  int m_num_control_responses_received;
+  int m_num_control_messages_sent = 0;
+  int m_num_control_responses_received = 0;
 
 };
 } // namespace ctbmodule
