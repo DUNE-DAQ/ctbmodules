@@ -34,7 +34,7 @@ def get_boardcontroller_app(
     modules += [DAQModule(name = nickname, 
                           plugin = 'CTBModule',
                           #conf = ctb.Conf(board_config=ctb.Board_config(ctb=ctb.Ctb(misc=ctb.Misc(randomtrigger_1=ctb.Randomtrigger(description="Random trigger that can optionally be set to fire only during beam spill",enable=False,fixed_freq=True,beam_mode=True,period=100000),randomtrigger_2=ctb.Randomtrigger(description="Random trigger that can optionally be set to fire only during beam spill",enable=False,fixed_freq=True,beam_mode=True,period=100000)))))
-                          conf = ctb.Conf(fragment_ids="[0]", board_config=ctb.Board_config(ctb=ctb.Ctb(HLT=ctb.Hlt(trigger=[
+                          conf = ctb.Conf(board_config=ctb.Board_config(ctb=ctb.Ctb(HLT=ctb.Hlt(trigger=[
                                 ctb.Hlt_trigger(id="HLT_1",description="Reconstructable track beam trigger, no PDS selection, no CRT selection",enable=False,minc="0x2",mexc="0x0",prescale="0x1"),
                                 ctb.Hlt_trigger(id="HLT_2",description="Reconstructable track beam trigger, particle selection with Cherenkov detectors (HP=1,LP=1), no PDS selection, no CRT selection",enable=False,minc="0xE",mexc="0x0",prescale="0x1"),
                                 ctb.Hlt_trigger(id="HLT_3",description="Cherenkov particle selection with with C713=0 & C716=1, no CRT, no PDS",enable=False,minc="0xA",mexc="0x4",prescale="0x1"),

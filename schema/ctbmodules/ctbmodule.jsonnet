@@ -23,6 +23,8 @@ local ctbmodule = {
     string : s.string("String",
                        doc="A string field"),   
 
+    array: s.sequence("Array", self.uint8, doc="General Array Type"),
+
     receiver: s.record("Receiver",  [
         s.field("rollover", self.uint8, 125000),
         s.field("host", self.string, "localhost"),
@@ -125,8 +127,8 @@ local ctbmodule = {
     pds: s.record("Pds",  [
         s.field("channel_mask", self.string, "0xFFFFFF"),
         s.field("reshape_length", self.uint8, 5),
-        s.field("delays", self.string, ":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]"),
-        s.field("dac_thresholds", self.string, ":[2185,2194,2170,2176,2167,2200,2179,2197,2188,2179,2185,2191,2176,2182,2191,2182,2176,2173,2200,2185,2182,2176,2191,2167]"),
+        s.field("delays", self.array, [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]),
+        s.field("dac_thresholds", self.array, [2185,2194,2170,2176,2167,2200,2179,2197,2188,2179,2185,2191,2176,2182,2191,2182,2176,2173,2200,2185,2182,2176,2191,2167]),
         s.field("triggers", self.llt_trigger_seq, [self.llt_trigger]),
     ], doc="Central Trigger Board PDF Subsystem Configuration"),
 
@@ -134,14 +136,14 @@ local ctbmodule = {
         s.field("channel_mask", self.string, "0xFFFFFFFF"),
         s.field("pixelate", self.boolean, true),
         s.field("reshape_length", self.uint8, 5),
-        s.field("delays", self.string, ":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]"),
+        s.field("delays", self.array, [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]),
         s.field("triggers", self.llt_trigger_seq, [self.llt_trigger]),
     ], doc="Central Trigger Board CRT Subsystem Configuration"),
 
     beam: s.record("Beam",  [
         s.field("channel_mask", self.string, "0x17FB"),
         s.field("reshape_length", self.uint8, 50),
-        s.field("delays", self.string, ":[1,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0]"),
+        s.field("delays", self.array, [1,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0]),
         s.field("triggers", self.llt_trigger_red_seq, [self.llt_trigger]),
     ], doc="Central Trigger Board Beam Subsystem Configuration"),
 
@@ -251,8 +253,8 @@ local ctbmodule = {
         s.field("distribution_type", self.uint8, 1,
                 doc="CTB Distribution Type"), 
 
-        s.field("fragment_ids", self.string, "0",
-                doc="CTB Fragment IDs"), // In the case of just one fragment, "fragment_id: 0" would also work - should be [0]
+        s.field("fragment_ids", self.array, [0],
+                doc="CTB Fragment IDs"), // In the case of just one fragment, "fragment_id: 0" would also work
 
         s.field("board_id", self.uint8, 999,
                 doc="CTB Board ID"), 
