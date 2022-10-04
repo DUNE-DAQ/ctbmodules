@@ -68,6 +68,9 @@ CTBModule::init(const nlohmann::json& /*iniobj*/)
 void
 CTBModule::do_configure(const data_t& args)
 {
+
+  TLOG() << get_name() << ": Configuring CTB";
+
   m_cfg = args.get<ctbmodule::Conf>();
   m_receiver_port = m_cfg.receiver_connection_port;  
   m_buffer_size = m_cfg.buffer_size; //5000
@@ -120,7 +123,7 @@ CTBModule::do_configure(const data_t& args)
 
   const std::string receiver_address = boost::asio::ip::host_name() ;
   m_cfg.board_config.ctb.sockets.receiver.host = receiver_address ;
-  TLOG() << get_name() << ": Board packages receved at " << receiver_address << ':' << receiver_port << std::endl;
+  TLOG() << get_name() << ": Board packages received at " << receiver_address << ':' << receiver_port << std::endl;
 
   // create the json string
   nlohmann::json config;
@@ -137,6 +140,8 @@ CTBModule::do_start(const nlohmann::json& /*startobj*/)
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering do_start() method";
 
   TLOG() << get_name() << ": Sending start of run command";
+
+  thread_.start_working_thread();
 
   if ( m_has_calibration_stream ) {
     std::stringstream run;
@@ -174,6 +179,7 @@ CTBModule::do_stop(const nlohmann::json& /*stopobj*/)
     ers::error(CTBCommunicationError(ERS_HERE, "Unable to stop CTB"));
   }
   store_run_trigger_counters( 91919191 ) ; 
+  thread_.stop_working_thread();
 
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Exiting do_stop() method";
 }
@@ -262,7 +268,8 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
       }
 
       // push the word
-      while ( ! word_buffer.push( temp_word )) {
+      //while ( ! word_buffer.push( temp_word )) {
+      if ( ! word_buffer.push( temp_word )) {
         ers::warning(CTBBufferWarning(ERS_HERE, "Word Buffer full and cannot store more data")) ;
       }
 
@@ -286,7 +293,7 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
     }
 
   }
-
+  
   m_receiver_socket.close(closing_error) ;
 
   if ( closing_error ) {
@@ -317,8 +324,6 @@ bool CTBModule::read( T &obj) {
     TLOG() << get_name() <<  ": Socket closed: "<< receiving_error.message()  << std::endl ;
     return false ;
   }
-
-  
 
   if ( receiving_error ) {
     TLOG() << get_name() << ": Read failure: " << receiving_error.message() << std::endl ;
@@ -364,6 +369,23 @@ void CTBModule::init_calibration_file() {
   // _calibration_file.setf ( std::ios::hex, std::ios::basefield );
   // _calibration_file.unsetf ( std::ios::showbase );
   TLOG() << get_name() << ": New Calibration Stream file: " << global_name << std::endl ;
+
+}
+
+void CTBModule::update_calibration_file() {
+
+  if ( ! m_has_calibration_stream ) {
+    return ;
+  }
+  
+  std::chrono::steady_clock::time_point check_point = std::chrono::steady_clock::now();
+  
+  if ( check_point - m_last_calibration_file_update < m_calibration_file_interval ) {
+    return ;
+  }
+
+  m_calibration_file.close() ;
+  init_calibration_file() ;
 
 }
 

@@ -178,7 +178,7 @@ local ctbmodule = {
         s.field("control_connection_port", self.uint8, 8991,
                 doc="CTB Control Connection Port"),
 
-        s.field("receiver_connection_port", self.uint8, 0,
+        s.field("receiver_connection_port", self.uint8, 8992,
                 doc="CTB Receiver Connection Port"),
 
         s.field("ctb_hostname", self.string, "np04-ctb-1",
@@ -232,7 +232,7 @@ local ctbmodule = {
         s.field("throw_exception", self.boolean, true,
                 doc="CTB Throw Exception"), 
 
-        s.field("calibration_stream_output", self.string, "/scratch/ctb_calib",
+        s.field("calibration_stream_output", self.string, "",
                 doc="CTB Calibration Stream Output Path"),
 
         s.field("calibration_update", self.uint8, "5",
