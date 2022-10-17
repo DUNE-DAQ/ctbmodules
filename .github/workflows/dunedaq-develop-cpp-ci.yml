@@ -49,7 +49,7 @@ jobs:
         
     - name: setup dev area
       run: |
-          source /cvmfs/dunedaq.opensciencegrid.org/tools/dbt/latest/env.sh
+          source /cvmfs/dunedaq.opensciencegrid.org/tools/dbt/latest-gcc8/env.sh
           release_path=$(readlink -f /cvmfs/dunedaq-development.opensciencegrid.org/spack-nightly/last_successful)
           release_name=`basename $release_path`
           dbt-create -c -n ${release_name} dev-${{ matrix.os_name }}
@@ -65,7 +65,7 @@ jobs:
           cd $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}
           source dbt-env.sh
           dbt-workarea-env || true
-          spack unload $REPO || true
+          spack unload $REPO
           cp -pr $GITHUB_WORKSPACE/DUNE-DAQ/$REPO $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}/sourcecode
           [[ $REPO == "daq-cmake" ]] && dbt-build || dbt-build --lint
           dbt-workarea-env
