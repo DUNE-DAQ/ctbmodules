@@ -9,14 +9,16 @@ moo.io.default_load_path = get_moo_model_path()
 import moo.otypes
 
 moo.otypes.load_types('ctbmodules/ctbmodule.jsonnet')
+moo.otypes.load_types('readoutlibs/readoutconfig.jsonnet')
 
 # Import new types
 import dunedaq.ctbmodules.ctbmodule as ctb
 
+import dunedaq.readoutlibs.readoutconfig as rconf
+
 from daqconf.core.app import App, ModuleGraph
 from daqconf.core.daqmodule import DAQModule
 
-import dunedaq.readoutlibs.readoutconfig as rconf
 from daqconf.core.conf_utils import Direction, Queue
 
 #===============================================================================
@@ -96,13 +98,10 @@ def get_boardcontroller_app(
 
     modules += [DAQModule(name = f"ctb_llt_datahandler",
                         plugin = "HSIDataLinkHandler",
-                        conf = rconf.Conf(readoutmodelconf = rconf.ReadoutModelConf(source_queue_timeout_ms = QUEUE_POP_WAIT_MS,
-                                                                                    source_id=0,
-                                                                                    send_partial_fragment_if_available = True),
-                                             latencybufferconf = rconf.LatencyBufferConf(latency_buffer_size = LATENCY_BUFFER_SIZE,
-                                                                                         source_id=0),
-                                             rawdataprocessorconf = rconf.RawDataProcessorConf(source_id=0),
-                                             requesthandlerconf= rconf.RequestHandlerConf(latency_buffer_size = LATENCY_BUFFER_SIZE,
+                        conf = rconf.Conf(readoutmodelconf = rconf.ReadoutModelConf(source_queue_timeout_ms = QUEUE_POP_WAIT_MS, send_partial_fragment_if_available = True),
+                                          latencybufferconf = rconf.LatencyBufferConf(latency_buffer_size = LATENCY_BUFFER_SIZE, source_id=0),
+                                          rawdataprocessorconf = rconf.RawDataProcessorConf(source_id=0),
+                                          requesthandlerconf= rconf.RequestHandlerConf(latency_buffer_size = LATENCY_BUFFER_SIZE,
                                                                                           pop_limit_pct = 0.8,
                                                                                           pop_size_pct = 0.1,
                                                                                           source_id=0,
@@ -111,24 +110,24 @@ def get_boardcontroller_app(
                                                                                           warn_about_empty_buffer = False,
                                                                                           enable_raw_recording = False)
                                              ))]
-
-        modules += [DAQModule(name = f"ctb_hlt_datahandler",
+                                             
+    modules += [DAQModule(name = f"ctb_hlt_datahandler",
         plugin = "HSIDataLinkHandler",
         conf = rconf.Conf(readoutmodelconf = rconf.ReadoutModelConf(source_queue_timeout_ms = QUEUE_POP_WAIT_MS,
+                                                                source_id=1,
+                                                                send_partial_fragment_if_available = True),
+                        latencybufferconf = rconf.LatencyBufferConf(latency_buffer_size = LATENCY_BUFFER_SIZE,
+                                                                        source_id=1),
+                        rawdataprocessorconf = rconf.RawDataProcessorConf(source_id=1),
+                        requesthandlerconf= rconf.RequestHandlerConf(latency_buffer_size = LATENCY_BUFFER_SIZE,
+                                                                        pop_limit_pct = 0.8,
+                                                                        pop_size_pct = 0.1,
                                                                         source_id=1,
-                                                                        send_partial_fragment_if_available = True),
-                                latencybufferconf = rconf.LatencyBufferConf(latency_buffer_size = LATENCY_BUFFER_SIZE,
-                                                                                source_id=1),
-                                rawdataprocessorconf = rconf.RawDataProcessorConf(source_id=1),
-                                requesthandlerconf= rconf.RequestHandlerConf(latency_buffer_size = LATENCY_BUFFER_SIZE,
-                                                                                pop_limit_pct = 0.8,
-                                                                                pop_size_pct = 0.1,
-                                                                                source_id=1,
-                                                                                # output_file = f"output_{idx + MIN_LINK}.out",
-                                                                                request_timeout_ms = DATA_REQUEST_TIMEOUT,
-                                                                                warn_about_empty_buffer = False,
-                                                                                enable_raw_recording = False)
-                                ))]
+                                                                        # output_file = f"output_{idx + MIN_LINK}.out",
+                                                                        request_timeout_ms = DATA_REQUEST_TIMEOUT,
+                                                                        warn_about_empty_buffer = False,
+                                                                        enable_raw_recording = False)
+                        ))]
 
     queues = [Queue(f"ctb.llt_output",f"ctb_llt_datahandler.raw_input",f'ctb_llt_link', 100000),Queue(f"ctb.hlt_output",f"ctb_hlt_datahandler.raw_input",f'ctb_hlt_link', 100000)]
 
@@ -144,6 +143,8 @@ def get_boardcontroller_app(
 
     mgraph.add_endpoint(f"timesync_ctb_llt", f"ctb_llt_datahandler.timesync_output",    Direction.OUT, ["Timesync"], toposort=False)
     mgraph.add_endpoint(f"timesync_ctb_hlt", f"ctb_hlt_datahandler.timesync_output",    Direction.OUT, ["Timesync"], toposort=False)
+
+    mgraph.add_endpoint(None, None, Direction.IN, ["Timesync"])
 
     console.log('generated DAQ module')
     ctb_app = App(modulegraph=mgraph, name=nickname)

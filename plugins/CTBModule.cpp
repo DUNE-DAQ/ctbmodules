@@ -255,11 +255,14 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
       //check if it is a TS word and increment the counter
       if ( IsTSWord( temp_word ) ) {
         m_n_TS_words++ ;
+        std::cout << "Received timestamp word!" << std::endl;
       }
 
       else if ( IsFeedbackWord( temp_word ) ) {
         m_error_state.store( true ) ;
         content::word::feedback_t * feedback = reinterpret_cast<content::word::feedback_t*>( & temp_word ) ;
+        std::cout << "Received feedback word!" << std::endl;
+
         TLOG() << get_name() << ": Feedback word: " << std::endl
                                                   << std::hex 
                                                   << " \t Type -> " << feedback -> word_type << std::endl 
@@ -268,9 +271,7 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
                                                   << " \t Source -> " << feedback -> source << std::endl
                                                   << " \t Padding -> " << feedback -> padding << std::dec << std::endl ;
       }
-
-
-
+      
       // Send HSI data to a DLH 
       std::array<uint32_t, 7> hsi_struct;
       hsi_struct[0] = (0x1 << 6) | 0x1; // DAQHeader, frame version: 1, det id: 1, link for low level 0, link for high level 1, leave slot and crate as 0
