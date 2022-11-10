@@ -17,6 +17,8 @@
 #include "iomanager/Sender.hpp"
 #include "utilities/WorkerThread.hpp"
 
+#include "hsilibs/HSIEventSender.hpp"
+
 #include <ers/Issue.hpp>
 
 #include "CTBPacketContent.hpp"
@@ -39,7 +41,7 @@ namespace ctbmodules {
 /**
  * @brief CTBModule provides the command and readout interface to the Central Trigger Board hardware
  */
-class CTBModule : public dunedaq::appfwk::DAQModule
+class CTBModule : public dunedaq::hsilibs::HSIEventSender
 {
 public:
   /**
@@ -82,10 +84,16 @@ private:
   boost::asio::ip::tcp::socket m_receiver_socket;
   boost::asio::ip::tcp::endpoint m_endpoint;
 
+  std::shared_ptr<dunedaq::hsilibs::HSIEventSender::raw_sender_ct> m_llt_hsi_data_sender;
+  std::shared_ptr<dunedaq::hsilibs::HSIEventSender::raw_sender_ct> m_hlt_hsi_data_sender;
+
+
   // Commands
   void do_configure(const nlohmann::json& obj);
   void do_start(const nlohmann::json& obj);
   void do_stop(const nlohmann::json& obj);
+  void do_scrap(const nlohmann::json& obj){};
+  void do_hsievent_work(std::atomic<bool>& obj){};
 
   void send_reset() ;
   void send_config(const std::string & config);

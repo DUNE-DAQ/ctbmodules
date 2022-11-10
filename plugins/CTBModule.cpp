@@ -30,7 +30,7 @@ namespace dunedaq {
 namespace ctbmodules {
 
 CTBModule::CTBModule(const std::string& name)
-  : DAQModule(name)
+  : hsilibs::HSIEventSender(name)
   , m_is_running(false)
   , m_is_configured(false)
   , m_n_TS_words(0)
@@ -58,9 +58,11 @@ CTBModule::~CTBModule(){
 }
 
 void
-CTBModule::init(const nlohmann::json& /*iniobj*/)
+CTBModule::init(const nlohmann::json& init_data)
 {
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering init() method";
+  m_llt_hsi_data_sender = get_iom_sender<dunedaq::hsilibs::HSI_FRAME_STRUCT>(appfwk::connection_inst(init_data, "llt_output"));
+  m_hlt_hsi_data_sender = get_iom_sender<dunedaq::hsilibs::HSI_FRAME_STRUCT>(appfwk::connection_inst(init_data, "hlt_output"));
 
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Exiting init() method";
 }
@@ -266,6 +268,32 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
                                                   << " \t Source -> " << feedback -> source << std::endl
                                                   << " \t Padding -> " << feedback -> padding << std::dec << std::endl ;
       }
+
+
+
+      // Send HSI data to a DLH 
+      std::array<uint32_t, 7> hsi_struct;
+      hsi_struct[0] = (0x1 << 6) | 0x1; // DAQHeader, frame version: 1, det id: 1, link for low level 0, link for high level 1, leave slot and crate as 0
+      hsi_struct[1] = 0;//ts;
+      hsi_struct[2] = 0;//ts >> 32;
+      hsi_struct[3] = 0;//signal_map;
+      hsi_struct[4] = 0x0;
+      hsi_struct[5] = 0;//trigger_map;
+      hsi_struct[6] = 0;//m_generated_counter;
+
+      TLOG_DEBUG(3) << get_name() << ": Formed HSI_FRAME_STRUCT "
+            << std::hex 
+            << "0x"   << hsi_struct[0]
+            << ", 0x" << hsi_struct[1]
+            << ", 0x" << hsi_struct[2]
+            << ", 0x" << hsi_struct[3]
+            << ", 0x" << hsi_struct[4]
+            << ", 0x" << hsi_struct[5]
+            << ", 0x" << hsi_struct[6]
+            << "\n";
+
+      send_raw_hsi_data(hsi_struct, m_llt_hsi_data_sender.get());
+
 
       // push the word
       //while ( ! word_buffer.push( temp_word )) {
