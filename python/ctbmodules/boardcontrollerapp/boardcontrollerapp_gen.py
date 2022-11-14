@@ -144,6 +144,7 @@ def get_boardcontroller_app(
     mgraph.add_endpoint(f"timesync_ctb_llt", f"ctb_llt_datahandler.timesync_output",    Direction.OUT, ["Timesync"], toposort=False)
     mgraph.add_endpoint(f"timesync_ctb_hlt", f"ctb_hlt_datahandler.timesync_output",    Direction.OUT, ["Timesync"], toposort=False)
 
+    mgraph.add_endpoint("hsievents", None,     Direction.OUT)
     mgraph.add_endpoint(None, None, Direction.IN, ["Timesync"])
 
     console.log('generated DAQ module')
