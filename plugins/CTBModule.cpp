@@ -13,6 +13,7 @@
 #include "appfwk/DAQModuleHelper.hpp"
 #include "iomanager/IOManager.hpp"
 #include "logging/Logging.hpp"
+#include "rcif/cmd/Nljs.hpp"
 
 #include <chrono>
 #include <string>
@@ -41,6 +42,8 @@ CTBModule::CTBModule(const std::string& name)
   , m_receiver_socket(m_receiver_ios)
   , thread_(std::bind(&CTBModule::do_work, this, std::placeholders::_1))
   , m_has_calibration_stream( false )
+  , m_run_HLT_counter(0)
+  , m_run_LLT_counter(0)
 {
   register_command("conf", &CTBModule::do_configure);
   register_command("start", &CTBModule::do_start);
@@ -131,18 +134,20 @@ CTBModule::do_configure(const data_t& args)
   nlohmann::json config;
   to_json(config, m_cfg.board_config);
   //TLOG() << "CONF TEST: " << config.dump();
-  send_config(config.dump());
 
+  send_config(config.dump());
 }
 
 void
-CTBModule::do_start(const nlohmann::json& /*startobj*/)
+CTBModule::do_start(const nlohmann::json& startobj)
 {
 
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering do_start() method";
 
-  TLOG() << get_name() << ": Sending start of run command";
+  auto start_params = startobj.get<rcif::cmd::StartParams>();
+  m_run_number.store(start_params.run);
 
+  TLOG() << get_name() << ": Sending start of run command";
   thread_.start_working_thread();
 
   if ( m_has_calibration_stream ) {
@@ -182,6 +187,9 @@ CTBModule::do_stop(const nlohmann::json& /*stopobj*/)
   }
   store_run_trigger_counters( 91919191 ) ; 
   thread_.stop_working_thread();
+
+  m_run_HLT_counter=0;
+  m_run_LLT_counter=0;
 
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Exiting do_stop() method";
 }
@@ -245,6 +253,7 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
         break ;
       }
 
+      TLOG() << "Received word type: " << temp_word.word_type;
       // put it in the calibration stream
       if ( m_has_calibration_stream ) {
         m_calibration_file.write( reinterpret_cast<const char*>( & temp_word ), word_size ) ;
@@ -255,13 +264,13 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
       //check if it is a TS word and increment the counter
       if ( IsTSWord( temp_word ) ) {
         m_n_TS_words++ ;
-        std::cout << "Received timestamp word!" << std::endl;
+        TLOG_DEBUG(3) << "Received timestamp word!";
       }
 
       else if ( IsFeedbackWord( temp_word ) ) {
         m_error_state.store( true ) ;
         content::word::feedback_t * feedback = reinterpret_cast<content::word::feedback_t*>( & temp_word ) ;
-        std::cout << "Received feedback word!" << std::endl;
+        TLOG_DEBUG(3) << "Received feedback word!";
 
         TLOG() << get_name() << ": Feedback word: " << std::endl
                                                   << std::hex 
@@ -270,31 +279,68 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
                                                   << " \t Code -> " << feedback -> code << std::endl
                                                   << " \t Source -> " << feedback -> source << std::endl
                                                   << " \t Padding -> " << feedback -> padding << std::dec << std::endl ;
+      } else if (temp_word.word_type == content::word::t_gt)
+      {
+
+        ++m_run_HLT_counter;
+        content::word::trigger_t * hlt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word ) ;
+    
+        // Send HSI data to a DLH 
+        std::array<uint32_t, 7> hsi_struct;
+        hsi_struct[0] = (0x1 << 26) | (0x1 << 6) | 0x1; // DAQHeader, frame version: 1, det id: 1, link for low level 0, link for high level 1, leave slot and crate as 0
+        hsi_struct[1] = hlt_word->timestamp; // ts low
+        hsi_struct[2] = hlt_word->timestamp >> 32; // ts high
+        hsi_struct[3] = 0x0; // TODO fill with corresponding llt
+        hsi_struct[4] = 0x0; // TODO fill with corresponding llt
+        hsi_struct[5] = hlt_word->trigger_word; // trigger_map;
+        hsi_struct[6] = m_run_HLT_counter; //m_generated_counter;
+  
+        TLOG_DEBUG(3) << get_name() << ": Formed HSI_FRAME_STRUCT for hlt "
+              << std::hex 
+              << "0x"   << hsi_struct[0]
+              << ", 0x" << hsi_struct[1]
+              << ", 0x" << hsi_struct[2]
+              << ", 0x" << hsi_struct[3]
+              << ", 0x" << hsi_struct[4]
+              << ", 0x" << hsi_struct[5]
+              << ", 0x" << hsi_struct[6]
+              << "\n";
+  
+        send_raw_hsi_data(hsi_struct, m_hlt_hsi_data_sender.get());
+
+        // TODO properly fill device id
+        dfmessages::HSIEvent event = dfmessages::HSIEvent(0x1, hlt_word->trigger_word, hlt_word->timestamp, m_run_HLT_counter, m_run_number);
+        send_hsi_event(event);
       }
-      
-      // Send HSI data to a DLH 
-      std::array<uint32_t, 7> hsi_struct;
-      hsi_struct[0] = (0x1 << 6) | 0x1; // DAQHeader, frame version: 1, det id: 1, link for low level 0, link for high level 1, leave slot and crate as 0
-      hsi_struct[1] = 0;//ts;
-      hsi_struct[2] = 0;//ts >> 32;
-      hsi_struct[3] = 0;//signal_map;
-      hsi_struct[4] = 0x0;
-      hsi_struct[5] = 0;//trigger_map;
-      hsi_struct[6] = 0;//m_generated_counter;
+      else if (temp_word.word_type == content::word::t_lt)
+      {
 
-      TLOG_DEBUG(3) << get_name() << ": Formed HSI_FRAME_STRUCT "
-            << std::hex 
-            << "0x"   << hsi_struct[0]
-            << ", 0x" << hsi_struct[1]
-            << ", 0x" << hsi_struct[2]
-            << ", 0x" << hsi_struct[3]
-            << ", 0x" << hsi_struct[4]
-            << ", 0x" << hsi_struct[5]
-            << ", 0x" << hsi_struct[6]
-            << "\n";
+        ++m_run_LLT_counter;
+        content::word::trigger_t * llt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word ) ;
+  
+        // Send HSI data to a DLH 
+        std::array<uint32_t, 7> hsi_struct;
+        hsi_struct[0] = (0x1 << 6) | 0x1; // DAQHeader, frame version: 1, det id: 1, link for low level 0, link for high level 1, leave slot and crate as 0
+        hsi_struct[1] = llt_word->timestamp; // ts low
+        hsi_struct[2] = llt_word->timestamp >> 32; // ts high
+        hsi_struct[3] = 0x0; // TODO fill with corresponding raw input
+        hsi_struct[4] = 0x0; // TODO fill with corresponding raw input
+        hsi_struct[5] = llt_word->trigger_word; // trigger_map;
+        hsi_struct[6] = m_run_LLT_counter; //m_generated_counter;
+  
+        TLOG_DEBUG(3) << get_name() << ": Formed HSI_FRAME_STRUCT for llt "
+              << std::hex 
+              << "0x"   << hsi_struct[0]
+              << ", 0x" << hsi_struct[1]
+              << ", 0x" << hsi_struct[2]
+              << ", 0x" << hsi_struct[3]
+              << ", 0x" << hsi_struct[4]
+              << ", 0x" << hsi_struct[5]
+              << ", 0x" << hsi_struct[6]
+              << "\n";
 
-      send_raw_hsi_data(hsi_struct, m_llt_hsi_data_sender.get());
-
+        send_raw_hsi_data(hsi_struct, m_llt_hsi_data_sender.get());
+      }
 
       // push the word
       //while ( ! word_buffer.push( temp_word )) {

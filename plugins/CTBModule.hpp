@@ -90,9 +90,9 @@ private:
 
   // Commands
   void do_configure(const nlohmann::json& obj);
-  void do_start(const nlohmann::json& obj);
+  void do_start(const nlohmann::json& startobj);
   void do_stop(const nlohmann::json& obj);
-  void do_scrap(const nlohmann::json& obj){};
+  void do_scrap(const nlohmann::json& obj){}
   void do_hsievent_work(std::atomic<bool>& obj){};
 
   void send_reset() ;
@@ -101,6 +101,7 @@ private:
 
   // Configuration
   dunedaq::ctbmodules::ctbmodule::Conf m_cfg;
+  std::atomic<daqdataformats::run_number_t> m_run_number;
 
   // Threading
   dunedaq::utilities::WorkerThread thread_;
@@ -129,10 +130,11 @@ private:
   bool store_run_trigger_counters( unsigned int run_number, const std::string & prefix = "" ) const;
 
 
-  unsigned long m_run_gool_part_counter = 0;
-  unsigned long m_run_HLT_counter = 0;
+  std::atomic<unsigned long> m_run_gool_part_counter = 0;
+  std::atomic<unsigned long> m_run_HLT_counter = 0;
+  // TODO should be atomic?
   unsigned long m_run_HLT_counters[8] = {0};
-
+  std::atomic<unsigned long> m_run_LLT_counter;
   // metric utilities
 
   const std::array<std::string, 8> m_metric_HLT_names  = { "CTB_HLT_0_rate",

@@ -22,11 +22,14 @@ from daqconf.core.daqmodule import DAQModule
 from daqconf.core.conf_utils import Direction, Queue
 
 #===============================================================================
-def get_boardcontroller_app(
+def get_ctb_hsi_app(
         nickname,
+        LLT_SOURCE_ID,
+        HLT_SOURCE_ID,
         QUEUE_POP_WAIT_MS=10,
         LATENCY_BUFFER_SIZE=100000,
         DATA_REQUEST_TIMEOUT=1000,
+        HOST="localhost",
 ):
     '''
     Here an entire application controlling one CTB board is generated. 
@@ -98,13 +101,15 @@ def get_boardcontroller_app(
 
     modules += [DAQModule(name = f"ctb_llt_datahandler",
                         plugin = "HSIDataLinkHandler",
-                        conf = rconf.Conf(readoutmodelconf = rconf.ReadoutModelConf(source_queue_timeout_ms = QUEUE_POP_WAIT_MS, send_partial_fragment_if_available = True),
-                                          latencybufferconf = rconf.LatencyBufferConf(latency_buffer_size = LATENCY_BUFFER_SIZE, source_id=0),
-                                          rawdataprocessorconf = rconf.RawDataProcessorConf(source_id=0),
+                        conf = rconf.Conf(readoutmodelconf = rconf.ReadoutModelConf(source_queue_timeout_ms = QUEUE_POP_WAIT_MS, 
+                                                                                    source_id=LLT_SOURCE_ID,
+                                                                                    send_partial_fragment_if_available = True),
+                                          latencybufferconf = rconf.LatencyBufferConf(latency_buffer_size = LATENCY_BUFFER_SIZE, source_id=LLT_SOURCE_ID),
+                                          rawdataprocessorconf = rconf.RawDataProcessorConf(source_id=LLT_SOURCE_ID),
                                           requesthandlerconf= rconf.RequestHandlerConf(latency_buffer_size = LATENCY_BUFFER_SIZE,
                                                                                           pop_limit_pct = 0.8,
                                                                                           pop_size_pct = 0.1,
-                                                                                          source_id=0,
+                                                                                          source_id=LLT_SOURCE_ID,
                                                                                           # output_file = f"output_{idx + MIN_LINK}.out",
                                                                                           request_timeout_ms = DATA_REQUEST_TIMEOUT,
                                                                                           warn_about_empty_buffer = False,
@@ -114,15 +119,15 @@ def get_boardcontroller_app(
     modules += [DAQModule(name = f"ctb_hlt_datahandler",
         plugin = "HSIDataLinkHandler",
         conf = rconf.Conf(readoutmodelconf = rconf.ReadoutModelConf(source_queue_timeout_ms = QUEUE_POP_WAIT_MS,
-                                                                source_id=1,
+                                                                source_id=HLT_SOURCE_ID,
                                                                 send_partial_fragment_if_available = True),
                         latencybufferconf = rconf.LatencyBufferConf(latency_buffer_size = LATENCY_BUFFER_SIZE,
-                                                                        source_id=1),
-                        rawdataprocessorconf = rconf.RawDataProcessorConf(source_id=1),
+                                                                        source_id=HLT_SOURCE_ID),
+                        rawdataprocessorconf = rconf.RawDataProcessorConf(source_id=HLT_SOURCE_ID),
                         requesthandlerconf= rconf.RequestHandlerConf(latency_buffer_size = LATENCY_BUFFER_SIZE,
                                                                         pop_limit_pct = 0.8,
                                                                         pop_size_pct = 0.1,
-                                                                        source_id=1,
+                                                                        source_id=HLT_SOURCE_ID,
                                                                         # output_file = f"output_{idx + MIN_LINK}.out",
                                                                         request_timeout_ms = DATA_REQUEST_TIMEOUT,
                                                                         warn_about_empty_buffer = False,
