@@ -143,7 +143,7 @@ local ctbmodule = {
     beam: s.record("Beam",  [
         s.field("channel_mask", self.string, "0x17FB"),
         s.field("reshape_length", self.uint8, 50),
-        s.field("delays", self.array, [1,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0]),
+        s.field("delays", self.array, [1,1,1,0,0,1,1,1,1]),
         s.field("triggers", self.llt_trigger_red_seq, [self.llt_trigger]),
     ], doc="Central Trigger Board Beam Subsystem Configuration"),
 
@@ -168,6 +168,9 @@ local ctbmodule = {
 
 
     conf: s.record("Conf", [
+
+        s.field("hsievent_connection_name", self.string, 
+                doc="Connection name to be used to send hsievent to"),
 
         s.field("buffer_size", self.uint8, 5000,
                 doc="CTB Word Buffer Size"),

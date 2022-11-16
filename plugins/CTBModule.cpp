@@ -76,9 +76,12 @@ CTBModule::do_configure(const data_t& args)
 
   TLOG() << get_name() << ": Configuring CTB";
 
+
   m_cfg = args.get<ctbmodule::Conf>();
   m_receiver_port = m_cfg.receiver_connection_port;  
   m_buffer_size = m_cfg.buffer_size; //5000
+
+  m_hsievent_send_connection = m_cfg.hsievent_connection_name;
 
   // Initialise monitoring variables
   m_num_control_messages_sent = 0;
@@ -253,7 +256,7 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
         break ;
       }
 
-      TLOG() << "Received word type: " << temp_word.word_type;
+      TLOG_DEBUG(6) << "Received word type: " << temp_word.word_type;
       // put it in the calibration stream
       if ( m_has_calibration_stream ) {
         m_calibration_file.write( reinterpret_cast<const char*>( & temp_word ), word_size ) ;
@@ -264,13 +267,13 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
       //check if it is a TS word and increment the counter
       if ( IsTSWord( temp_word ) ) {
         m_n_TS_words++ ;
-        TLOG_DEBUG(3) << "Received timestamp word!";
+        TLOG_DEBUG(5) << "Received timestamp word!";
       }
 
       else if ( IsFeedbackWord( temp_word ) ) {
         m_error_state.store( true ) ;
         content::word::feedback_t * feedback = reinterpret_cast<content::word::feedback_t*>( & temp_word ) ;
-        TLOG_DEBUG(3) << "Received feedback word!";
+        TLOG_DEBUG(6) << "Received feedback word!";
 
         TLOG() << get_name() << ": Feedback word: " << std::endl
                                                   << std::hex 
@@ -281,7 +284,7 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
                                                   << " \t Padding -> " << feedback -> padding << std::dec << std::endl ;
       } else if (temp_word.word_type == content::word::t_gt)
       {
-
+        TLOG_DEBUG(3) << "Received HLT word!";
         ++m_run_HLT_counter;
         content::word::trigger_t * hlt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word ) ;
     
@@ -314,7 +317,7 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
       }
       else if (temp_word.word_type == content::word::t_lt)
       {
-
+        TLOG_DEBUG(4) << "Received LLT word!";
         ++m_run_LLT_counter;
         content::word::trigger_t * llt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word ) ;
   
