@@ -141,9 +141,9 @@ local ctbmodule = {
     ], doc="Central Trigger Board CRT Subsystem Configuration"),
 
     beam: s.record("Beam",  [
-        s.field("channel_mask", self.string, "0x17FB"),
+        s.field("channel_mask", self.string, "0x1FB"),
         s.field("reshape_length", self.uint8, 50),
-        s.field("delays", self.array, [1,1,1,0,0,1,1,1,1]),
+        s.field("delays", self.array, [1,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0]),
         s.field("triggers", self.llt_trigger_red_seq, [self.llt_trigger]),
     ], doc="Central Trigger Board Beam Subsystem Configuration"),
 
