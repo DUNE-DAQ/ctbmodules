@@ -19,15 +19,12 @@
 namespace dunedaq {
 
 // Disable coverage collection LCOV_EXCL_START
-ERS_DECLARE_ISSUE(ctbmodules, 
-                  CTBCommunicationError, 
-                  " CTB Hardware Communication Error: " << descriptor, 
+ERS_DECLARE_ISSUE(ctbmodules,
+                  CTBCommunicationError,
+                  " CTB Hardware Communication Error: " << descriptor,
                   ((std::string)descriptor))
 
-ERS_DECLARE_ISSUE(ctbmodules, 
-                  CTBBufferWarning, 
-                  " CTB Buffer Issue: " << descriptor, 
-                  ((std::string)descriptor))
+ERS_DECLARE_ISSUE(ctbmodules, CTBBufferWarning, " CTB Buffer Issue: " << descriptor, ((std::string)descriptor))
 
 // Re-enable coverage collection LCOV_EXCL_STOP
 
