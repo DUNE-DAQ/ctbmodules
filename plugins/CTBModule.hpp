@@ -58,6 +58,8 @@ public:
 
   void init(const nlohmann::json& iniobj) override;
 
+  static uint32_t MatchLlt( const uint64_t hlt_ts, const std::pair<uint64_t,uint32_t> &prev_llt, const std::pair<uint64_t,uint32_t> &prev_prev_llt) noexcept;
+  static uint64_t MatchTriggerInput(const uint64_t trigger_ts, const std::pair<uint64_t,uint64_t> &prev_input, const std::pair<uint64_t,uint64_t> &prev_prev_input) noexcept;
   static bool IsTSWord( const content::word::word_t &w ) noexcept;
   static bool IsFeedbackWord( const content::word::word_t &w ) noexcept;
   bool ErrorState() const { return m_error_state.load() ; } 
@@ -135,6 +137,7 @@ private:
   // TODO should be atomic?
   unsigned long m_run_HLT_counters[8] = {0};
   std::atomic<unsigned long> m_run_LLT_counter;
+  std::atomic<unsigned long> m_run_channel_status_counter = 0;
   // metric utilities
 
   const std::array<std::string, 8> m_metric_HLT_names  = { "CTB_HLT_0_rate",

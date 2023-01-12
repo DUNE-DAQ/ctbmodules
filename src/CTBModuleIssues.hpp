@@ -29,6 +29,14 @@ ERS_DECLARE_ISSUE(ctbmodules,
                   " CTB Buffer Issue: " << descriptor, 
                   ((std::string)descriptor))
 
+ERS_DECLARE_ISSUE(ctbmodules, 
+                  CTBWordMatchWarning, 
+                  " CTB Word Matching Warning: " << descriptor, 
+                  ((std::string)descriptor))
+
+
+
+
 // Re-enable coverage collection LCOV_EXCL_STOP
 
 } // namespace dunedaq
