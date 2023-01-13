@@ -40,11 +40,14 @@ CTBModule::CTBModule(const std::string& name)
   , m_receiver_ios()
   , m_control_socket(m_control_ios)
   , m_receiver_socket(m_receiver_ios)
-  , thread_(std::bind(&CTBModule::do_work, this, std::placeholders::_1))
+  , m_thread_(std::bind(&CTBModule::do_hsi_work, this, std::placeholders::_1))
   , m_has_calibration_stream( false )
   , m_run_HLT_counter(0)
   , m_run_LLT_counter(0)
   , m_run_channel_status_counter(0)
+  , m_num_control_messages_sent(0)
+  , m_num_control_responses_received(0)
+  , m_last_readout_hlt_timestamp(0)
 {
   register_command("conf", &CTBModule::do_configure);
   register_command("start", &CTBModule::do_start);
@@ -75,7 +78,7 @@ void
 CTBModule::do_configure(const data_t& args)
 {
 
-  TLOG() << get_name() << ": Configuring CTB";
+  TLOG_DEBUG(0) << get_name() << ": Configuring CTB";
 
 
   m_cfg = args.get<ctbmodule::Conf>();
@@ -132,7 +135,7 @@ CTBModule::do_configure(const data_t& args)
 
   const std::string receiver_address = boost::asio::ip::host_name() ;
   m_cfg.board_config.ctb.sockets.receiver.host = receiver_address ;
-  TLOG() << get_name() << ": Board packages received at " << receiver_address << ':' << receiver_port << std::endl;
+  TLOG_DEBUG(0) << get_name() << ": Board packages received at " << receiver_address << ':' << receiver_port << std::endl;
 
   // create the json string
   nlohmann::json config;
@@ -151,8 +154,8 @@ CTBModule::do_start(const nlohmann::json& startobj)
   auto start_params = startobj.get<rcif::cmd::StartParams>();
   m_run_number.store(start_params.run);
 
-  TLOG() << get_name() << ": Sending start of run command";
-  thread_.start_working_thread();
+  TLOG_DEBUG(0) << get_name() << ": Sending start of run command";
+  m_thread_.start_working_thread();
 
   if ( m_has_calibration_stream ) {
     std::stringstream run;
@@ -164,7 +167,7 @@ CTBModule::do_start(const nlohmann::json& startobj)
 
   if ( send_message( "{\"command\":\"StartRun\"}" )  ) {
     m_is_running.store(true);
-    TLOG() << get_name() << ": successfully started";
+    TLOG_DEBUG(1) << get_name() << ": successfully started";
   }
   else{
     ers::error(CTBCommunicationError(ERS_HERE, "Unable to start CTB"));
@@ -179,10 +182,10 @@ CTBModule::do_stop(const nlohmann::json& /*stopobj*/)
 
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering do_stop() method";
 
-  TLOG() << get_name() << ": Sending stop run command" << std::endl;
+  TLOG_DEBUG(0) << get_name() << ": Sending stop run command" << std::endl;
 
   if(send_message( "{\"command\":\"StopRun\"}" ) ){
-    TLOG() << get_name() << ": successfully stopped";
+    TLOG_DEBUG(1) << get_name() << ": successfully stopped";
 
     m_is_running.store( false ) ;
   }
@@ -190,7 +193,7 @@ CTBModule::do_stop(const nlohmann::json& /*stopobj*/)
     ers::error(CTBCommunicationError(ERS_HERE, "Unable to stop CTB"));
   }
   store_run_trigger_counters( 91919191 ) ; 
-  thread_.stop_working_thread();
+  m_thread_.stop_working_thread();
 
   m_run_HLT_counter=0;
   m_run_LLT_counter=0;
@@ -200,7 +203,7 @@ CTBModule::do_stop(const nlohmann::json& /*stopobj*/)
 }
 
 void
-CTBModule::do_work(std::atomic<bool>& running_flag)
+CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
 {
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering do_work() method";
 
@@ -213,11 +216,11 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
   // the raw buffer can contain 4 times the maximum TCP package size, which is 4 KB
   boost::lockfree::spsc_queue< content::word::word_t > word_buffer(m_buffer_size);
 
-  TLOG() << get_name() <<  ": Header size: " << header_size << std::endl << "Word size: " << word_size << std::endl;
+  TLOG_DEBUG(TLVL_CTB_MODULE) << get_name() <<  ": Header size: " << header_size << std::endl << "Word size: " << word_size << std::endl;
 
   //connect to socket
   boost::asio::ip::tcp::acceptor acceptor(m_receiver_ios, boost::asio::ip::tcp::endpoint( boost::asio::ip::tcp::v4(), m_receiver_port ) );
-  TLOG() << get_name() << ": Waiting for an incoming connection on port " << m_receiver_port << std::endl;
+  TLOG_DEBUG(0) << get_name() << ": Waiting for an incoming connection on port " << m_receiver_port << std::endl;
 
   std::future<void> accepting = async( std::launch::async, [&]{ acceptor.accept(m_receiver_socket) ; } ) ;
 
@@ -227,7 +230,7 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
     }
   }
 
-  TLOG() << get_name() <<  ": Connection received: start reading" << std::endl;
+  TLOG_DEBUG(0) << get_name() <<  ": Connection received: start reading" << std::endl;
 
   content::tcp_header_t head ;
   head.packet_size = 0;
@@ -254,6 +257,8 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
 
     n_words = n_bytes / word_size ;
     // read n words as requested from the header
+    
+    update_buffer_counts(n_words);
 
     for ( unsigned int i = 0 ; i < n_words ; ++i ) {
       //read a word
@@ -261,8 +266,6 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
         connection_closed = true ;
         break ;
       }
-
-      TLOG_DEBUG(6) << "Received word type: " << temp_word.word_type;
       // put it in the calibration stream
       if ( m_has_calibration_stream ) {
         m_calibration_file.write( reinterpret_cast<const char*>( & temp_word ), word_size ) ;
@@ -273,16 +276,16 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
       //check if it is a TS word and increment the counter
       if ( IsTSWord( temp_word ) ) {
         m_n_TS_words++ ;
-        TLOG_DEBUG(5) << "Received timestamp word!";
+        TLOG_DEBUG(9) << "Received timestamp word! TS: "+temp_word.timestamp;
         prev_timestamp = temp_word.timestamp;
       }
 
       else if ( IsFeedbackWord( temp_word ) ) {
         m_error_state.store( true ) ;
         content::word::feedback_t * feedback = reinterpret_cast<content::word::feedback_t*>( & temp_word ) ;
-        TLOG_DEBUG(6) << "Received feedback word!";
+        TLOG_DEBUG(7) << "Received feedback word!";
 
-        TLOG() << get_name() << ": Feedback word: " << std::endl
+        TLOG_DEBUG(8) << get_name() << ": Feedback word: " << std::endl
                                                   << std::hex 
                                                   << " \t Type -> " << feedback -> word_type << std::endl 
                                                   << " \t TS -> " << feedback -> timestamp << std::endl
@@ -295,6 +298,7 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
         ++m_run_HLT_counter;
         content::word::trigger_t * hlt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word ) ;
 
+        m_last_readout_hlt_timestamp = hlt_word->timestamp;
         // Now find the associated LLT
         llt_payload = MatchTriggerInput( hlt_word->timestamp, prev_llt, prev_prev_llt);
     
@@ -308,7 +312,7 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
         hsi_struct[5] = hlt_word->trigger_word;    // trigger_map;
         hsi_struct[6] = m_run_HLT_counter;         // m_generated_counter;
   
-        TLOG_DEBUG(3) << get_name() << ": Formed HSI_FRAME_STRUCT for hlt "
+        TLOG_DEBUG(4) << get_name() << ": Formed HSI_FRAME_STRUCT for hlt "
               << std::hex 
               << "0x"   << hsi_struct[0]
               << ", 0x" << hsi_struct[1]
@@ -327,7 +331,7 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
       }
       else if (temp_word.word_type == content::word::t_lt)
       {
-        TLOG_DEBUG(4) << "Received LLT word!";
+        TLOG_DEBUG(5) << "Received LLT word!";
         ++m_run_LLT_counter;
         content::word::trigger_t * llt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word ) ;
 
@@ -344,7 +348,7 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
         hsi_struct[5] = llt_word->trigger_word;    // trigger_map;
         hsi_struct[6] = m_run_LLT_counter;         // m_generated_counter;
   
-        TLOG_DEBUG(3) << get_name() << ": Formed HSI_FRAME_STRUCT for llt "
+        TLOG_DEBUG(6) << get_name() << ": Formed HSI_FRAME_STRUCT for llt "
               << std::hex 
               << "0x"   << hsi_struct[0]
               << ", 0x" << hsi_struct[1]
@@ -364,7 +368,7 @@ CTBModule::do_work(std::atomic<bool>& running_flag)
       else if (temp_word.word_type == content::word::t_ch)
       {
 
-        TLOG_DEBUG(4) << "Received Channel Status word!";
+        TLOG_DEBUG(5) << "Received Channel Status word!";
         ++m_run_channel_status_counter;
         content::word::ch_status_t * ch_stat_word = reinterpret_cast<content::word::ch_status_t*>( & temp_word ) ;
 
@@ -432,12 +436,14 @@ bool CTBModule::read( T &obj) {
   }
 
   if ( receiving_error == boost::asio::error::eof) {
-    TLOG() << get_name() <<  ": Socket closed: "<< receiving_error.message()  << std::endl ;
+    std::string error_message = "Socket closed: " + receiving_error.message();
+    ers::error(CTBCommunicationError(ERS_HERE, error_message));
     return false ;
   }
 
   if ( receiving_error ) {
-    TLOG() << get_name() << ": Read failure: " << receiving_error.message() << std::endl ;
+    std::string error_message = "Read failure: " + receiving_error.message();
+    ers::error(CTBCommunicationError(ERS_HERE, error_message));
     return false ;
   }
 
@@ -458,7 +464,7 @@ uint64_t CTBModule::MatchTriggerInput( const uint64_t trigger_ts, const std::pai
     std::stringstream msg;
     msg << "No Input word match found for Trigger TS " << trigger_ts << " (Input TS prev=" 
         << prev_input.first << " prev_prev=" << prev_prev_input.first << ")";
-    TLOG() << msg.str();
+
     // FIXME change to an error after testing, we're missing data if we arrive here!
     ers::warning(CTBWordMatchWarning(ERS_HERE, msg.str()));
     return 0;
@@ -501,7 +507,7 @@ void CTBModule::init_calibration_file() {
   m_last_calibration_file_update = std::chrono::steady_clock::now();
   // _calibration_file.setf ( std::ios::hex, std::ios::basefield );
   // _calibration_file.unsetf ( std::ios::showbase );
-  TLOG() << get_name() << ": New Calibration Stream file: " << global_name << std::endl ;
+  TLOG_DEBUG(0) << get_name() << ": New Calibration Stream file: " << global_name << std::endl ;
 
 }
 
@@ -561,12 +567,12 @@ void CTBModule::send_config( const std::string & config ) {
 
   if ( m_is_configured.load() ) {
 
-    TLOG() << get_name() << ": Resetting before configuring" << std::endl;
+    TLOG_DEBUG(1) << get_name() << ": Resetting before configuring" << std::endl;
     send_reset();
 
   }
 
-  TLOG() << get_name() << ": Sending config" << std::endl;
+  TLOG_DEBUG(1) << get_name() << ": Sending config" << std::endl;
 
   if ( send_message( config ) ) {
 
@@ -580,7 +586,7 @@ void CTBModule::send_config( const std::string & config ) {
 
 void CTBModule::send_reset() {
 
-  TLOG() << get_name() << ": Sending a reset" << std::endl;
+  TLOG_DEBUG(1) << get_name() << ": Sending a reset" << std::endl;
 
   if(send_message( "{\"command\":\"HardReset\"}" )){
 
@@ -599,7 +605,7 @@ bool CTBModule::send_message( const std::string & msg ) {
   //add error options                                                                                                
 
   boost::system::error_code error;
-  TLOG() << get_name() << ": Sending message: " << msg;
+  TLOG_DEBUG(1) << get_name() << ": Sending message: " << msg;
 
   m_num_control_messages_sent++;
 
@@ -607,12 +613,12 @@ bool CTBModule::send_message( const std::string & msg ) {
   boost::array<char, 1024> reply_buf{" "} ;
   m_control_socket.read_some( boost::asio::buffer(reply_buf ), error);
   std::stringstream raw_answer( std::string(reply_buf .begin(), reply_buf .end() ) ) ;
-  TLOG() << get_name() << ": Unformatted answer: " << raw_answer.str(); 
+  TLOG_DEBUG(1) << get_name() << ": Unformatted answer: " << raw_answer.str(); 
 
   nlohmann::json answer ;
   raw_answer >> answer ;
   nlohmann::json & messages = answer["feedback"] ;
-  TLOG() << get_name() << ": Received messages: " << messages.size();
+  TLOG_DEBUG(1) << get_name() << ": Received messages: " << messages.size();
 
   bool ret = true ;
   for (nlohmann::json::size_type i = 0; i != messages.size(); ++i ) {
@@ -621,14 +627,14 @@ bool CTBModule::send_message( const std::string & msg ) {
 
     std::string type = messages[i]["type"].dump() ;
     if ( type.find("error") != std::string::npos || type.find("Error") != std::string::npos || type.find("ERROR") != std::string::npos ) {
-      TLOG() << get_name() << ": Error from the Board: " << messages[i]["message"].dump();
+      ers::error(CTBMessage(ERS_HERE, messages[i]["message"].dump()));
       ret = false ;
     }
     else if ( type.find("warning") != std::string::npos || type.find("Warning") != std::string::npos || type.find("WARNING") != std::string::npos ) {
-      TLOG() << get_name() << ": Warning from the Board: " << messages[i]["message"].dump();
+      ers::warning(CTBMessage(ERS_HERE, messages[i]["message"].dump()));
     }
     else if ( type.find("info") != std::string::npos || type.find("Info") != std::string::npos || type.find("INFO") != std::string::npos) {
-      TLOG() << get_name() << ": Info from the board: " << messages[i]["message"].dump();
+      ers::info(CTBMessage(ERS_HERE, messages[i]["message"].dump()));
     }
     else {
       std::stringstream blob;
@@ -641,22 +647,54 @@ bool CTBModule::send_message( const std::string & msg ) {
   
 }
 
-void CTBModule::get_info(opmonlib::InfoCollector& ci, int /*level*/){
+void
+CTBModule::update_buffer_counts(uint new_count) // NOLINT(build/unsigned)
+{
+  std::unique_lock mon_data_lock(m_buffer_counts_mutex);
+  if (m_buffer_counts.size() > 1000)
+    m_buffer_counts.pop_front();
+  m_buffer_counts.push_back(new_count);
+}
 
-    dunedaq::ctbmodules::ctbmoduleinfo::CTBModuleInfo moduleInfo;
+double
+CTBModule::read_average_buffer_counts()
+{
+  std::unique_lock mon_data_lock(m_buffer_counts_mutex);
 
-    moduleInfo.num_control_messages_sent = 
-    moduleInfo.num_control_responses_received = 
-    moduleInfo.ctb_hardware_run_status = m_is_running; 
-    moduleInfo.ctb_hardware_configuration_status = m_is_configured;
-    moduleInfo.num_ts_words_received = m_n_TS_words;
-    
-    ci.add(moduleInfo);
+  double total_counts;
+  uint32_t number_of_counts; // NOLINT(build/unsigned)
+
+  total_counts = 0;
+  number_of_counts = m_buffer_counts.size();
+
+  if (number_of_counts) {
+    for (uint i = 0; i < number_of_counts; ++i) { // NOLINT(build/unsigned)
+      total_counts = total_counts + m_buffer_counts.at(i);
+    }
+    return total_counts / number_of_counts;
+  } else {
+    return 0;
   }
+}
 
+void CTBModule::get_info(opmonlib::InfoCollector& ci, int /*level*/)
+{
+  dunedaq::ctbmodules::ctbmoduleinfo::CTBModuleInfo module_info;
 
+  module_info.num_control_messages_sent = m_num_control_messages_sent.load();
+  module_info.num_control_responses_received = m_num_control_responses_received.load();
+  module_info.ctb_hardware_run_status = m_is_running; 
+  module_info.ctb_hardware_configuration_status = m_is_configured;
+  module_info.num_ts_words_received = m_n_TS_words;
+    
+  module_info.last_readout_timestamp = m_last_readout_hlt_timestamp.load();
+  module_info.sent_hsi_events_counter = m_sent_counter.load();
+  module_info.failed_to_send_hsi_events_counter = m_failed_to_send_counter.load();
+  module_info.last_sent_timestamp = m_last_sent_timestamp.load();
+  module_info.average_buffer_occupancy = read_average_buffer_counts();
 
-
+  ci.add(module_info);
+}
 
 } // namespace ctbmodules
 } // namespace dunedaq

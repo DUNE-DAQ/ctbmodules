@@ -30,6 +30,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include <shared_mutex>
 
 #include <boost/asio.hpp>
 #include <boost/array.hpp>
@@ -94,8 +95,7 @@ private:
   void do_configure(const nlohmann::json& obj);
   void do_start(const nlohmann::json& startobj);
   void do_stop(const nlohmann::json& obj);
-  void do_scrap(const nlohmann::json& obj){}
-  void do_hsievent_work(std::atomic<bool>& obj){};
+  void do_scrap(const nlohmann::json& /*obj*/){}
 
   void send_reset() ;
   void send_config(const std::string & config);
@@ -106,8 +106,8 @@ private:
   std::atomic<daqdataformats::run_number_t> m_run_number;
 
   // Threading
-  dunedaq::utilities::WorkerThread thread_;
-  void do_work(std::atomic<bool>&);
+  dunedaq::utilities::WorkerThread m_thread_;
+  void do_hsi_work(std::atomic<bool>&);
 
   template<typename T>
   bool read(T &obj);
@@ -149,10 +149,17 @@ private:
                                                             "CTB_HLT_6_rate",
                                                             "CTB_HLT_7_rate" };
 
+
   // monitoring
 
-  int m_num_control_messages_sent = 0;
-  int m_num_control_responses_received = 0;
+  std::deque<uint> m_buffer_counts; // NOLINT(build/unsigned)
+  std::shared_mutex m_buffer_counts_mutex;
+  void update_buffer_counts(uint new_count); // NOLINT(build/unsigned)
+  double read_average_buffer_counts();
+
+  std::atomic<int> m_num_control_messages_sent;
+  std::atomic<int> m_num_control_responses_received;
+  std::atomic<uint64_t> m_last_readout_hlt_timestamp; // NOLINT(build/unsigned)
 
 };
 } // namespace ctbmodule

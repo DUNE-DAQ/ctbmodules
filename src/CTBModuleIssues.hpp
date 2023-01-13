@@ -34,6 +34,11 @@ ERS_DECLARE_ISSUE(ctbmodules,
                   " CTB Word Matching Warning: " << descriptor, 
                   ((std::string)descriptor))
 
+ERS_DECLARE_ISSUE(ctbmodules,
+                  CTBMessage,
+                  " Mesage from CTB: " << descriptor,
+                  ((std::string)descriptor))
+
 
 
 
