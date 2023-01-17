@@ -132,7 +132,7 @@ CTBModule::do_configure(const data_t& args)
   // complete the json configuration
   // with the receiver host which is the machines where the board reader is running
 
-  const std::string receiver_address = boost::asio::ip::host_name() ;
+  const std::string receiver_address = boost::asio::ip::host_name() + ".cern.ch";
   m_cfg.board_config.ctb.sockets.receiver.host = receiver_address ;
   TLOG_DEBUG(0) << get_name() << ": Board packages received at " << receiver_address << ':' << receiver_port << std::endl;
 
