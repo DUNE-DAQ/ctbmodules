@@ -83,7 +83,6 @@ CTBModule::do_configure(const data_t& args)
 
   m_cfg = args.get<ctbmodule::Conf>();
   m_receiver_port = m_cfg.receiver_connection_port;  
-  m_buffer_size = m_cfg.buffer_size; //5000
 
   m_hsievent_send_connection = m_cfg.hsievent_connection_name;
 
@@ -212,9 +211,6 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
 
   const size_t header_size = sizeof( content::tcp_header_t ) ;
   const size_t word_size = content::word::word_t::size_bytes ;
-
-  // the raw buffer can contain 4 times the maximum TCP package size, which is 4 KB
-  boost::lockfree::spsc_queue< content::word::word_t > word_buffer(m_buffer_size);
 
   TLOG_DEBUG(TLVL_CTB_MODULE) << get_name() <<  ": Header size: " << header_size << std::endl << "Word size: " << word_size << std::endl;
 
@@ -380,12 +376,6 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
         // from the TS Word. (fyi 60b rolls over >500yr @ 62.5MHz) 
         prev_prev_channel = prev_channel;
         prev_channel = { ((prev_timestamp & 0xF000000000000000) | ch_stat_word->timestamp),  ((ch_stat_pds << 48) | (ch_stat_crt << 16) | ch_stat_beam) };
-      }
-
-      // push the word
-      //while ( ! word_buffer.push( temp_word )) {
-      if ( ! word_buffer.push( temp_word )) {
-        ers::warning(CTBBufferWarning(ERS_HERE, "Word Buffer full and cannot store more data")) ;
       }
 
     } // n_words loop
