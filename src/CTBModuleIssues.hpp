@@ -30,8 +30,8 @@ ERS_DECLARE_ISSUE(ctbmodules,
                   ((std::string)descriptor))
 
 ERS_DECLARE_ISSUE(ctbmodules, 
-                  CTBWordMatchWarning, 
-                  " CTB Word Matching Warning: " << descriptor, 
+                  CTBWordMatchError, 
+                  " CTB Word Matching Error: " << descriptor, 
                   ((std::string)descriptor))
 
 ERS_DECLARE_ISSUE(ctbmodules,

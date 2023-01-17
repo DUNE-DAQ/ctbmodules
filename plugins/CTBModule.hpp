@@ -59,8 +59,7 @@ public:
 
   void init(const nlohmann::json& iniobj) override;
 
-  static uint32_t MatchLlt( const uint64_t hlt_ts, const std::pair<uint64_t,uint32_t> &prev_llt, const std::pair<uint64_t,uint32_t> &prev_prev_llt) noexcept;
-  static uint64_t MatchTriggerInput(const uint64_t trigger_ts, const std::pair<uint64_t,uint64_t> &prev_input, const std::pair<uint64_t,uint64_t> &prev_prev_input) noexcept;
+  static uint64_t MatchTriggerInput(const uint64_t trigger_ts, const std::pair<uint64_t,uint64_t> &prev_input, const std::pair<uint64_t,uint64_t> &prev_prev_input, bool hlt_matching) noexcept;
   static bool IsTSWord( const content::word::word_t &w ) noexcept;
   static bool IsFeedbackWord( const content::word::word_t &w ) noexcept;
   bool ErrorState() const { return m_error_state.load() ; } 

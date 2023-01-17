@@ -296,7 +296,7 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
 
         m_last_readout_hlt_timestamp = hlt_word->timestamp;
         // Now find the associated LLT
-        llt_payload = MatchTriggerInput( hlt_word->timestamp, prev_llt, prev_prev_llt);
+        llt_payload = MatchTriggerInput( hlt_word->timestamp, prev_llt, prev_prev_llt, true );
     
         // Send HSI data to a DLH 
         std::array<uint32_t, 7> hsi_struct;
@@ -332,7 +332,7 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
         content::word::trigger_t * llt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word ) ;
 
         // Find the matching channel status word
-        channel_payload = MatchTriggerInput( llt_word->timestamp, prev_channel, prev_prev_channel );
+        channel_payload = MatchTriggerInput( llt_word->timestamp, prev_channel, prev_prev_channel, false );
   
         // Send HSI data to a DLH 
         std::array<uint32_t, 7> hsi_struct;
@@ -440,23 +440,27 @@ bool CTBModule::read( T &obj) {
   return true ;
 }
 
-uint64_t CTBModule::MatchTriggerInput( const uint64_t trigger_ts, const std::pair<uint64_t,uint64_t> &prev_input, const std::pair<uint64_t,uint64_t> &prev_prev_input ) noexcept {
+uint64_t CTBModule::MatchTriggerInput( const uint64_t trigger_ts, const std::pair<uint64_t,uint64_t> &prev_input, const std::pair<uint64_t,uint64_t> &prev_prev_input, bool hlt_matching) noexcept {
  
   // The first condition should be true the majority of the time and the "else" should never happen.
 
-  if ( trigger_ts == prev_input.first - 1 ) { 
+  if ( trigger_ts == prev_input.first + 1 ) { 
     return prev_input.second; 
   } 
-  else if( trigger_ts == prev_prev_input.first - 1 ) { 
+  else if( trigger_ts == prev_prev_input.first + 1 ) { 
     return prev_prev_input.second; 
   } 
   else {
     std::stringstream msg;
-    msg << "No Input word match found for Trigger TS " << trigger_ts << " (Input TS prev=" 
-        << prev_input.first << " prev_prev=" << prev_prev_input.first << ")";
-
-    // FIXME change to an error after testing, we're missing data if we arrive here!
-    ers::warning(CTBWordMatchWarning(ERS_HERE, msg.str()));
+    if ( hlt_matching ) { 
+      msg << "No LLT match found for HLT TS " << trigger_ts << " (LLT TS prev=" 
+          << prev_input.first << " prev_prev=" << prev_prev_input.first << ")";
+    } 
+    else {
+      msg << "No Channel Status match found for LLT TS " << trigger_ts << " (Channel Status TS prev=" 
+          << prev_input.first << " prev_prev=" << prev_prev_input.first << ")";
+    }
+    ers::error(CTBWordMatchError(ERS_HERE, msg.str()));
     return 0;
   }
 
