@@ -54,7 +54,9 @@ def get_ctb_hsi_app(
         HLT_LIST=None,
         BEAM_LLT_LIST=None,
         CRT_LLT_LIST=None,
-        PDS_LLT_LIST=None
+        PDS_LLT_LIST=None,
+        FAKE_TRIG_1=None,
+        FAKE_TRIG_2=None
 ):
     '''
     Here an entire application controlling one CTB board is generated. 
@@ -73,6 +75,7 @@ def get_ctb_hsi_app(
     beam_trig = ctb.Beam().pod()
     crt_trig = ctb.Crt().pod()
     pds_trig = ctb.Pds().pod()
+    fake_triggers = ctb.Misc().pod()
 
     # Update LLT, HLTs with new or redefined triggers
     updated_hlt_triggers = update_triggers(updated_triggers=HLT_LIST, default_trigger_conf=hlt_trig["trigger"])
@@ -80,10 +83,20 @@ def get_ctb_hsi_app(
     updated_crt_triggers = update_triggers(updated_triggers=CRT_LLT_LIST, default_trigger_conf=crt_trig["triggers"])
     updated_pds_triggers = update_triggers(updated_triggers=PDS_LLT_LIST, default_trigger_conf=pds_trig["triggers"])
 
+    # Accept top config level fake trigger definition
+    fake_trig_1 = fake_triggers["randomtrigger_1"]
+    fake_trig_2 = fake_triggers["randomtrigger_2"]
+    if FAKE_TRIG_1 is not None:
+        fake_trig_1 = FAKE_TRIG_1
+    if FAKE_TRIG_2 is not None:
+        fake_trig_2 = FAKE_TRIG_2
+
+
     modules += [DAQModule(name = nickname, 
                           plugin = 'CTBModule',
                           conf = ctb.Conf(hsievent_connection_name = "hsievents",
-                                board_config=ctb.Board_config(ctb=ctb.Ctb(HLT=ctb.Hlt(trigger=updated_hlt_triggers),
+                                board_config=ctb.Board_config(ctb=ctb.Ctb(misc=ctb.Misc(randomtrigger_1=fake_trig_1, randomtrigger_2=fake_trig_2),
+                                HLT=ctb.Hlt(trigger=updated_hlt_triggers),
                                 subsystems=ctb.Subsystems(pds=ctb.Pds(triggers=updated_pds_triggers),
                                                           crt=ctb.Crt(triggers=updated_crt_triggers),
                                                           beam=ctb.Beam(triggers=updated_beam_triggers)) 
