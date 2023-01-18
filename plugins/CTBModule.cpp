@@ -101,14 +101,6 @@ CTBModule::do_configure(const data_t& args)
   // TODO should we put this into a try?
   m_control_socket.connect( m_endpoint );
 
-  // prepare the receiver
-  // get the json configuration string
-  //std::stringstream json_stream(static_cast<nlohmann::json>(m_cfg.board_config)) ;
-  //nlohmann::json jblob;
-  //json_stream >> jblob;
-
-  //nlohmann::json conf_json = nlohmann::json::parse(m_cfg.board_config);
-
   // if necessary, set the calibration stream
   if ( m_cfg.calibration_stream_output != "")  {
     m_has_calibration_stream = true ; 
@@ -144,7 +136,7 @@ CTBModule::do_start(const nlohmann::json& startobj)
 
   if ( m_has_calibration_stream ) {
     std::stringstream run;
-    run << "run" << 91919191;//run_number();
+    run << "run" << start_params.run;
     SetCalibrationStream(run.str()) ;
   }
 
@@ -177,7 +169,7 @@ CTBModule::do_stop(const nlohmann::json& /*stopobj*/)
   else{
     ers::error(CTBCommunicationError(ERS_HERE, "Unable to stop CTB"));
   }
-  store_run_trigger_counters( 91919191 ) ; 
+  store_run_trigger_counters( m_run_number ) ; 
   m_thread_.stop_working_thread();
 
   m_run_HLT_counter=0;
@@ -234,7 +226,6 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
     }
 
     n_bytes = head.packet_size ;
-    //    dune::DAQLogger::LogInfo("CTB_Receiver") << "Package size "  << n_bytes << std::endl ;
     // extract n_words
 
     n_words = n_bytes / word_size ;
@@ -252,7 +243,6 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
       if ( m_has_calibration_stream ) {
         m_calibration_file.write( reinterpret_cast<const char*>( & temp_word ), word_size ) ;
         m_calibration_file.flush() ;
-        //dune::DAQLogger::LogInfo("CTB_Receiver") << "Word Type: " << temp_word.frame.word_type << std::endl ;
       }          // word printing in calibration stream
       
       //check if it is a TS word and increment the counter
@@ -429,6 +419,7 @@ bool CTBModule::read( T &obj) {
 uint64_t CTBModule::MatchTriggerInput( const uint64_t trigger_ts, const std::pair<uint64_t,uint64_t> &prev_input, const std::pair<uint64_t,uint64_t> &prev_prev_input, bool hlt_matching) noexcept {
  
   // The first condition should be true the majority of the time and the "else" should never happen.
+  // Find the matching word whcih caused the LLT or HLT and return its payload
 
   if ( trigger_ts == prev_input.first + 1 ) { 
     return prev_input.second; 
@@ -453,8 +444,6 @@ uint64_t CTBModule::MatchTriggerInput( const uint64_t trigger_ts, const std::pai
 }
 
 bool CTBModule::IsTSWord( const content::word::word_t &w ) noexcept {
-
-  //dune::DAQLogger::LogInfo("CTB_Receiver") << "word type " <<  w.frame.word_type  << std::endl ;
 
   if ( w.word_type == content::word::t_ts ) {
     return true;
