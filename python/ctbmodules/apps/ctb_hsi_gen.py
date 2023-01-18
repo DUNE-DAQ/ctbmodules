@@ -99,7 +99,8 @@ def get_ctb_hsi_app(
                                 HLT=ctb.Hlt(trigger=updated_hlt_triggers),
                                 subsystems=ctb.Subsystems(pds=ctb.Pds(triggers=updated_pds_triggers),
                                                           crt=ctb.Crt(triggers=updated_crt_triggers),
-                                                          beam=ctb.Beam(triggers=updated_beam_triggers)) 
+                                                          beam=ctb.Beam(triggers=updated_beam_triggers)),
+                                sockets=ctb.Sockets(receiver=ctb.Receiver(host=HOST)) 
                                 )))
                              )]
 
@@ -158,6 +159,6 @@ def get_ctb_hsi_app(
     mgraph.add_endpoint(None, None, Direction.IN, ["Timesync"])
 
     console.log('generated DAQ module')
-    ctb_app = App(modulegraph=mgraph, name=nickname)
+    ctb_app = App(modulegraph=mgraph, host=HOST, name=nickname)
 
     return ctb_app
