@@ -34,7 +34,6 @@
 
 #include <boost/asio.hpp>
 #include <boost/array.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
 
 namespace dunedaq {
 namespace ctbmodules {
@@ -77,7 +76,6 @@ private:
   std::chrono::microseconds m_timeout;
   std::atomic<unsigned int> m_n_TS_words;
   std::atomic<bool> m_error_state;
-  unsigned int m_rollover;
 
   boost::asio::io_service m_control_ios;
   boost::asio::io_service m_receiver_ios;

@@ -220,17 +220,11 @@ local ctbmodule = {
         s.field("hsievent_connection_name", self.string, 
                 doc="Connection name to be used to send hsievent to"),
 
-        s.field("buffer_size", self.uint8, 5000,
-                doc="CTB Word Buffer Size"),
-
-        s.field("receiver_connection_timeout", self.uint8, 10,
+        s.field("receiver_connection_timeout", self.uint8, 1000,
                 doc="CTB Receiver Connection Timeout value (microseconds)"),
 
         s.field("control_connection_port", self.uint8, 8991,
                 doc="CTB Control Connection Port"),
-
-        s.field("receiver_connection_port", self.uint8, 8992,
-                doc="CTB Receiver Connection Port"),
 
         s.field("ctb_hostname", self.string, "np04-ctb-1",
                 doc="CTB Hostname"),
@@ -265,12 +259,6 @@ local ctbmodule = {
         s.field("data_buffer_depth_fragments", self.uint8, 12000,
                 doc="CTB Data Buffer Depth (num fragments)"), // CTB Default 1000
 
-        s.field("board_address", self.string, "np04-ctb-1",
-                doc="CTB Board Address"),
-
-        s.field("control_port", self.uint8, 8991,
-                doc="CTB Control Port"),
-
         s.field("group_size", self.uint8, 1,
                 doc="CTB Group Size"), // this sets how many pakages from the board should be grouped to form a fragment. Default 1
 
@@ -292,9 +280,6 @@ local ctbmodule = {
         s.field("run_trigger_output", self.string, "/nfs/sw/trigger/counters",
                 doc="CTB Trigger Output Path"),
  
-        s.field("receiver_timeout_scaling", self.uint8, 4,
-                doc="CTB Receiver Timeout Scaling"), // default 2
-
         s.field("nADCcounts", self.uint8, 100,
                 doc="CTB nADC Counts"), 
 

@@ -80,23 +80,25 @@ CTBModule::do_configure(const data_t& args)
 
   TLOG_DEBUG(0) << get_name() << ": Configuring CTB";
 
-
   m_cfg = args.get<ctbmodule::Conf>();
-  m_receiver_port = m_cfg.receiver_connection_port;  
-
+  m_receiver_port = m_cfg.board_config.ctb.sockets.receiver.port;  
+  m_timeout = std::chrono::microseconds( m_cfg.receiver_connection_timeout ) ;
   m_hsievent_send_connection = m_cfg.hsievent_connection_name;
+
+  TLOG_DEBUG(0) << get_name() << ": Board receiver network location " << m_cfg.board_config.ctb.sockets.receiver.host << ':' << m_cfg.board_config.ctb.sockets.receiver.port << std::endl;
 
   // Initialise monitoring variables
   m_num_control_messages_sent = 0;
   m_num_control_responses_received = 0;
 
+  // network connection to ctb hardware control
   boost::asio::ip::tcp::resolver resolver( m_control_ios ); 
   boost::asio::ip::tcp::resolver::query query(m_cfg.ctb_hostname, std::to_string(m_cfg.control_connection_port) ) ; //"np04-ctb-1", 8991
   boost::asio::ip::tcp::resolver::iterator iter = resolver.resolve(query) ;
 
   m_endpoint = iter->endpoint(); 
  
-  //shoudl we put this into a try?
+  // TODO should we put this into a try?
   m_control_socket.connect( m_endpoint );
 
   // prepare the receiver
@@ -107,16 +109,7 @@ CTBModule::do_configure(const data_t& args)
 
   //nlohmann::json conf_json = nlohmann::json::parse(m_cfg.board_config);
 
-  // get the receiver port from the json
-  const unsigned int receiver_port = m_cfg.board_config.ctb.sockets.receiver.port;
-  m_rollover = m_cfg.board_config.ctb.sockets.receiver.rollover;
-  const unsigned int timeout_scaling = m_cfg.receiver_timeout_scaling;
-  const unsigned int timeout = m_rollover / 50 / timeout_scaling; //microseconds
-
-  //                                      |-> this is the board clock frequency which is 50 MHz
-  m_timeout = std::chrono::microseconds( timeout ) ;
   // if necessary, set the calibration stream
-
   if ( m_cfg.calibration_stream_output != "")  {
     m_has_calibration_stream = true ; 
     m_calibration_dir = m_cfg.calibration_stream_output ;
@@ -128,13 +121,6 @@ CTBModule::do_configure(const data_t& args)
     m_run_trigger_dir = m_cfg.run_trigger_output;
     if ( m_run_trigger_dir.back() != '/' ) m_run_trigger_dir += '/' ;
   }
-
-  // complete the json configuration
-  // with the receiver host which is the machines where the board reader is running
-
-  const std::string receiver_address = boost::asio::ip::host_name() + ".cern.ch";
-  m_cfg.board_config.ctb.sockets.receiver.host = receiver_address ;
-  TLOG_DEBUG(0) << get_name() << ": Board packages received at " << receiver_address << ':' << receiver_port << std::endl;
 
   // create the json string
   nlohmann::json config;
