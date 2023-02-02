@@ -122,9 +122,9 @@ namespace dunedaq {
            typedef uint64_t wtype_size_t;
            ts_size_t     timestamp  : 60;
            beam_size_t   beam_lo    : 4;
-           beam_size_t   beam_hi    : 5;
+           beam_size_t   beam_hi    : 12;
            crt_size_t    crt        : 32;
-           pds_size_t    pds        : 24;
+           pds_size_t    pds        : 17;
            wtype_size_t  word_type  : 3;
            static size_t const size_bytes = 2*sizeof(uint64_t);
            static size_t const size_u32 = size_bytes/sizeof(uint32_t);
@@ -135,7 +135,7 @@ namespace dunedaq {
            // aux_functions
            beam_size_t get_beam() const {return (beam_hi << 4 | beam_lo);}
            crt_size_t  get_crt()  const {return (crt & 0xFFFFFFFF);}
-           pds_size_t  get_pds()  const {return (pds & 0xFFFFFFF);}
+           pds_size_t  get_pds()  const {return (pds & 0x1FFFF);}
 
            bool get_state_crt(const uint16_t channel) {
              return ((crt & (0x1 << channel)) != 0x0);
