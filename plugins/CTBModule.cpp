@@ -147,7 +147,7 @@ CTBModule::do_start(const nlohmann::json& startobj)
     TLOG_DEBUG(1) << get_name() << ": successfully started";
   }
   else{
-    ers::error(CTBCommunicationError(ERS_HERE, "Unable to start CTB"));
+    throw CTBCommunicationError(ERS_HERE, "Unable to start CTB");
   }
 
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Exiting do_start() method";
@@ -167,7 +167,7 @@ CTBModule::do_stop(const nlohmann::json& /*stopobj*/)
     m_is_running.store( false ) ;
   }
   else{
-    ers::error(CTBCommunicationError(ERS_HERE, "Unable to stop CTB"));
+    throw CTBCommunicationError(ERS_HERE, "Unable to stop CTB");
   }
   store_run_trigger_counters( m_run_number ) ; 
   m_thread_.stop_working_thread();
@@ -549,7 +549,7 @@ void CTBModule::send_config( const std::string & config ) {
 
   }
   else{
-      ers::error(CTBCommunicationError(ERS_HERE, "Unable to configure CTB"));
+      throw CTBCommunicationError(ERS_HERE, "Unable to configure CTB");
   }
 }
 
