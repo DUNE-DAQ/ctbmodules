@@ -17,6 +17,8 @@
 #include "iomanager/Sender.hpp"
 #include "utilities/WorkerThread.hpp"
 
+#include "hsilibs/HSIEventSender.hpp"
+
 #include <ers/Issue.hpp>
 
 #include "CTBPacketContent.hpp"
@@ -28,10 +30,10 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include <shared_mutex>
 
 #include <boost/asio.hpp>
 #include <boost/array.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
 
 namespace dunedaq {
 namespace ctbmodules {
@@ -39,7 +41,7 @@ namespace ctbmodules {
 /**
  * @brief CTBModule provides the command and readout interface to the Central Trigger Board hardware
  */
-class CTBModule : public dunedaq::appfwk::DAQModule
+class CTBModule : public dunedaq::hsilibs::HSIEventSender
 {
 public:
   /**
@@ -56,6 +58,7 @@ public:
 
   void init(const nlohmann::json& iniobj) override;
 
+  static uint64_t MatchTriggerInput(const uint64_t trigger_ts, const std::pair<uint64_t,uint64_t> &prev_input, const std::pair<uint64_t,uint64_t> &prev_prev_input, bool hlt_matching) noexcept;
   static bool IsTSWord( const content::word::word_t &w ) noexcept;
   static bool IsFeedbackWord( const content::word::word_t &w ) noexcept;
   bool ErrorState() const { return m_error_state.load() ; } 
@@ -73,8 +76,6 @@ private:
   std::chrono::microseconds m_timeout;
   std::atomic<unsigned int> m_n_TS_words;
   std::atomic<bool> m_error_state;
-  unsigned int m_buffer_size;
-  unsigned int m_rollover;
 
   boost::asio::io_service m_control_ios;
   boost::asio::io_service m_receiver_ios;
@@ -82,10 +83,15 @@ private:
   boost::asio::ip::tcp::socket m_receiver_socket;
   boost::asio::ip::tcp::endpoint m_endpoint;
 
+  std::shared_ptr<dunedaq::hsilibs::HSIEventSender::raw_sender_ct> m_llt_hsi_data_sender;
+  std::shared_ptr<dunedaq::hsilibs::HSIEventSender::raw_sender_ct> m_hlt_hsi_data_sender;
+
+
   // Commands
   void do_configure(const nlohmann::json& obj);
-  void do_start(const nlohmann::json& obj);
+  void do_start(const nlohmann::json& startobj);
   void do_stop(const nlohmann::json& obj);
+  void do_scrap(const nlohmann::json& /*obj*/){}
 
   void send_reset() ;
   void send_config(const std::string & config);
@@ -93,10 +99,11 @@ private:
 
   // Configuration
   dunedaq::ctbmodules::ctbmodule::Conf m_cfg;
+  std::atomic<daqdataformats::run_number_t> m_run_number;
 
   // Threading
-  dunedaq::utilities::WorkerThread thread_;
-  void do_work(std::atomic<bool>&);
+  dunedaq::utilities::WorkerThread m_thread_;
+  void do_hsi_work(std::atomic<bool>&);
 
   template<typename T>
   bool read(T &obj);
@@ -121,10 +128,12 @@ private:
   bool store_run_trigger_counters( unsigned int run_number, const std::string & prefix = "" ) const;
 
 
-  unsigned long m_run_gool_part_counter = 0;
-  unsigned long m_run_HLT_counter = 0;
+  std::atomic<unsigned long> m_run_gool_part_counter = 0;
+  std::atomic<unsigned long> m_run_HLT_counter = 0;
+  // TODO should be atomic?
   unsigned long m_run_HLT_counters[8] = {0};
-
+  std::atomic<unsigned long> m_run_LLT_counter;
+  std::atomic<unsigned long> m_run_channel_status_counter = 0;
   // metric utilities
 
   const std::array<std::string, 8> m_metric_HLT_names  = { "CTB_HLT_0_rate",
@@ -136,10 +145,17 @@ private:
                                                             "CTB_HLT_6_rate",
                                                             "CTB_HLT_7_rate" };
 
+
   // monitoring
 
-  int m_num_control_messages_sent = 0;
-  int m_num_control_responses_received = 0;
+  std::deque<uint> m_buffer_counts; // NOLINT(build/unsigned)
+  std::shared_mutex m_buffer_counts_mutex;
+  void update_buffer_counts(uint new_count); // NOLINT(build/unsigned)
+  double read_average_buffer_counts();
+
+  std::atomic<int> m_num_control_messages_sent;
+  std::atomic<int> m_num_control_responses_received;
+  std::atomic<uint64_t> m_last_readout_hlt_timestamp; // NOLINT(build/unsigned)
 
 };
 } // namespace ctbmodule

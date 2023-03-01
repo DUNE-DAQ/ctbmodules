@@ -12,6 +12,7 @@ find_dependency(appfwk)
 find_dependency(opmonlib)
 find_dependency(logging)
 find_dependency(ers)
+find_dependency(hsilibs)
 
 
 # Figure out whether or not this dependency is an installed package or
