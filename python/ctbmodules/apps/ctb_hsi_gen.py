@@ -94,8 +94,7 @@ def get_ctb_hsi_app(
 
     modules += [DAQModule(name = nickname, 
                           plugin = 'CTBModule',
-                          conf = ctb.Conf(hsievent_connection_name = "hsievents",
-                                board_config=ctb.Board_config(ctb=ctb.Ctb(misc=ctb.Misc(randomtrigger_1=fake_trig_1, randomtrigger_2=fake_trig_2),
+                          conf = ctb.Conf(board_config=ctb.Board_config(ctb=ctb.Ctb(misc=ctb.Misc(randomtrigger_1=fake_trig_1, randomtrigger_2=fake_trig_2),
                                 HLT=ctb.Hlt(trigger=updated_hlt_triggers),
                                 subsystems=ctb.Subsystems(pds=ctb.Pds(triggers=updated_pds_triggers),
                                                           crt=ctb.Crt(triggers=updated_crt_triggers),
@@ -140,23 +139,25 @@ def get_ctb_hsi_app(
                                                                         enable_raw_recording = False)
                         ))]
 
-    queues = [Queue(f"ctb.llt_output",f"ctb_llt_datahandler.raw_input",f'ctb_llt_link', 100000),Queue(f"ctb.hlt_output",f"ctb_hlt_datahandler.raw_input",f'ctb_hlt_link', 100000)]
+    queues = [Queue(f"{nickname}.llt_output",f"ctb_llt_datahandler.raw_input","HSIFrame",f'ctb_llt_link', 100000),Queue(f"{nickname}.hlt_output",f"ctb_hlt_datahandler.raw_input","HSIFrame",f'ctb_hlt_link', 100000)]
 
     mgraph = ModuleGraph(modules, queues=queues)
     
-    mgraph.add_fragment_producer(id = 0, subsystem = "HW_Signals_Interface",
+    mgraph.add_fragment_producer(id = LLT_SOURCE_ID, subsystem = "HW_Signals_Interface",
                                          requests_in   = f"ctb_llt_datahandler.request_input",
                                          fragments_out = f"ctb_llt_datahandler.fragment_queue")
 
-    mgraph.add_fragment_producer(id = 1, subsystem = "HW_Signals_Interface",
+    mgraph.add_fragment_producer(id = HLT_SOURCE_ID, subsystem = "HW_Signals_Interface",
                                          requests_in   = f"ctb_hlt_datahandler.request_input",
                                          fragments_out = f"ctb_hlt_datahandler.fragment_queue")
 
-    mgraph.add_endpoint(f"timesync_ctb_llt", f"ctb_llt_datahandler.timesync_output",    Direction.OUT, ["Timesync"], toposort=False)
-    mgraph.add_endpoint(f"timesync_ctb_hlt", f"ctb_hlt_datahandler.timesync_output",    Direction.OUT, ["Timesync"], toposort=False)
+    mgraph.add_endpoint(f"timesync_ctb_llt", f"ctb_llt_datahandler.timesync_output", "TimeSync", Direction.OUT, is_pubsub=True, toposort=False)
+    mgraph.add_endpoint(f"timesync_ctb_hlt", f"ctb_hlt_datahandler.timesync_output", "TimeSync", Direction.OUT, is_pubsub=True, toposort=False)
 
-    mgraph.add_endpoint("hsievents", None,     Direction.OUT)
-    mgraph.add_endpoint(None, None, Direction.IN, ["Timesync"])
+    mgraph.add_endpoint("hsievents", f"{nickname}.hsievents", "HSIEvent",    Direction.OUT)
+
+    # dummy subscriber
+    mgraph.add_endpoint(None, None, data_type="TimeSync", inout=Direction.IN, is_pubsub=True)
 
     console.log('generated DAQ module')
     ctb_app = App(modulegraph=mgraph, host=HOST, name=nickname)

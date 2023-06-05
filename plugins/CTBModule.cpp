@@ -68,6 +68,7 @@ void
 CTBModule::init(const nlohmann::json& init_data)
 {
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering init() method";
+  HSIEventSender::init(init_data);
   m_llt_hsi_data_sender = get_iom_sender<dunedaq::hsilibs::HSI_FRAME_STRUCT>(appfwk::connection_uid(init_data, "llt_output"));
   m_hlt_hsi_data_sender = get_iom_sender<dunedaq::hsilibs::HSI_FRAME_STRUCT>(appfwk::connection_uid(init_data, "hlt_output"));
 
@@ -83,7 +84,6 @@ CTBModule::do_configure(const data_t& args)
   m_cfg = args.get<ctbmodule::Conf>();
   m_receiver_port = m_cfg.board_config.ctb.sockets.receiver.port;  
   m_timeout = std::chrono::microseconds( m_cfg.receiver_connection_timeout ) ;
-  m_hsievent_send_connection = m_cfg.hsievent_connection_name;
 
   TLOG_DEBUG(0) << get_name() << ": Board receiver network location " << m_cfg.board_config.ctb.sockets.receiver.host << ':' << m_cfg.board_config.ctb.sockets.receiver.port << std::endl;
 
@@ -147,7 +147,7 @@ CTBModule::do_start(const nlohmann::json& startobj)
     TLOG_DEBUG(1) << get_name() << ": successfully started";
   }
   else{
-    ers::error(CTBCommunicationError(ERS_HERE, "Unable to start CTB"));
+    throw CTBCommunicationError(ERS_HERE, "Unable to start CTB");
   }
 
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Exiting do_start() method";
@@ -167,7 +167,7 @@ CTBModule::do_stop(const nlohmann::json& /*stopobj*/)
     m_is_running.store( false ) ;
   }
   else{
-    ers::error(CTBCommunicationError(ERS_HERE, "Unable to stop CTB"));
+    throw CTBCommunicationError(ERS_HERE, "Unable to stop CTB");
   }
   store_run_trigger_counters( m_run_number ) ; 
   m_thread_.stop_working_thread();
@@ -549,7 +549,7 @@ void CTBModule::send_config( const std::string & config ) {
 
   }
   else{
-      ers::error(CTBCommunicationError(ERS_HERE, "Unable to configure CTB"));
+      throw CTBCommunicationError(ERS_HERE, "Unable to configure CTB");
   }
 }
 

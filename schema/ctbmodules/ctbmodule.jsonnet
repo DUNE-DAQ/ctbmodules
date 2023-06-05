@@ -217,9 +217,6 @@ local ctbmodule = {
 
     conf: s.record("Conf", [
 
-        s.field("hsievent_connection_name", self.string, 
-                doc="Connection name to be used to send hsievent to"),
-
         s.field("receiver_connection_timeout", self.uint8, 1000,
                 doc="CTB Receiver Connection Timeout value (microseconds)"),
 
