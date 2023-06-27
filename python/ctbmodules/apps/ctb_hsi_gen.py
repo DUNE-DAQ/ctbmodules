@@ -44,23 +44,27 @@ def update_triggers(updated_triggers, default_trigger_conf):
 
 
 def get_ctb_hsi_app(
+        ctb_hsi,
         nickname,
         LLT_SOURCE_ID,
         HLT_SOURCE_ID,
         QUEUE_POP_WAIT_MS=10,
         LATENCY_BUFFER_SIZE=100000,
         DATA_REQUEST_TIMEOUT=1000,
-        HOST="localhost",
-        HLT_LIST=None,
-        BEAM_LLT_LIST=None,
-        CRT_LLT_LIST=None,
-        PDS_LLT_LIST=None,
-        FAKE_TRIG_1=None,
-        FAKE_TRIG_2=None
 ):
     '''
     Here an entire application controlling one CTB board is generated. 
     '''
+
+    # Temp variables - Remove
+    HOST=ctb_hsi.host_ctb_hsi
+    HLT_LIST=ctb_hsi.hlt_triggers
+    BEAM_LLT_LIST=ctb_hsi.beam_llt_triggers
+    CRT_LLT_LIST=ctb_hsi.crt_llt_triggers
+    PDS_LLT_LIST=ctb_hsi.pds_llt_triggers
+    FAKE_TRIG_1=ctb_hsi.fake_trig_1
+    FAKE_TRIG_2=ctb_hsi.fake_trig_2
+
     console = Console()
 
     # Define modules
