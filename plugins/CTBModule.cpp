@@ -603,7 +603,7 @@ bool CTBModule::send_message( const std::string & msg ) {
       ers::warning(CTBMessage(ERS_HERE, messages[i]["message"].dump()));
     }
     else if ( type.find("info") != std::string::npos || type.find("Info") != std::string::npos || type.find("INFO") != std::string::npos) {
-      ers::info(CTBMessage(ERS_HERE, messages[i]["message"].dump()));
+      TLOG() << "Message from the board: " << messages[i]["message"].dump();
     }
     else {
       std::stringstream blob;
