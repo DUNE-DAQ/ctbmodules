@@ -81,10 +81,10 @@ private:
   std::atomic<unsigned int> m_total_hlt_counter;
   std::atomic<unsigned int> m_ts_word_counter;
 
-  size_t m_hlt_range = 15;
-  size_t m_llt_range = 20;
-  std::vector<std::atomic<unsigned int>> m_hlt_trigger_counter;
-  std::vector<std::atomic<unsigned int>> m_llt_trigger_counter;
+  size_t m_hlt_range = 20;
+  size_t m_llt_range = 25;
+  std::map<size_t, std::atomic<unsigned int>> m_hlt_trigger_counter;
+  std::map<size_t, std::atomic<unsigned int>> m_llt_trigger_counter;
 
   boost::asio::io_service m_control_ios;
   boost::asio::io_service m_receiver_ios;

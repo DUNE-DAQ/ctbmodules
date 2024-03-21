@@ -37,8 +37,8 @@ CTBModule::CTBModule(const std::string& name)
   , m_error_state(false)
   , m_total_hlt_counter(0)
   , m_ts_word_counter(0) 
-  , m_hlt_trigger_counter(m_hlt_range)
-  , m_llt_trigger_counter(m_llt_range)
+  , m_hlt_trigger_counter()
+  , m_llt_trigger_counter()
   , m_control_ios()
   , m_receiver_ios()
   , m_control_socket(m_control_ios)
@@ -94,8 +94,27 @@ CTBModule::do_configure(const data_t& args)
   m_num_control_messages_sent = 0;
   m_num_control_responses_received = 0;
   m_ts_word_counter = 0;
-  for(auto &hlt : m_hlt_trigger_counter) hlt = 0;
-  for(auto &llt : m_llt_trigger_counter) llt = 0;
+
+  std::map<std::string, size_t> id_to_idx;
+  for(size_t i = 0; i < m_hlt_range; i++) id_to_idx["HLT_" + std::to_string(i)] = i;
+  for(size_t i = 0; i < m_llt_range; i++) id_to_idx["LLT_" + std::to_string(i)] = i;
+
+  nlohmann::json random_triggers = m_cfg.board_config.ctb.misc;
+
+  // HLTs
+  // 0th HLT is random trigger that's not in HLT array
+  if (random_triggers["randomtrigger_1"]["enable"]) m_hlt_trigger_counter[0] = 0;
+  nlohmann::json trigger_array = m_cfg.board_config.ctb.HLT.trigger;
+  for (const auto& trigger : trigger_array) { if (trigger["enable"]) m_hlt_trigger_counter[id_to_idx[trigger["id"]]] = 0; }
+
+  // LLTs: Beam and CRT
+  // 0th LLT is random trigger that's not in HLT array
+  if (random_triggers["randomtrigger_2"]["enable"]) m_llt_trigger_counter[0] = 0;
+  trigger_array = m_cfg.board_config.ctb.subsystems.crt.triggers;
+  for (const auto& trigger : trigger_array) { if (trigger["enable"]) m_llt_trigger_counter[id_to_idx[trigger["id"]]] = 0; }
+
+  trigger_array = m_cfg.board_config.ctb.subsystems.beam.triggers;
+  for (const auto& trigger : trigger_array) { if (trigger["enable"]) m_llt_trigger_counter[id_to_idx[trigger["id"]]] = 0; }
 
   // network connection to ctb hardware control
   boost::asio::ip::tcp::resolver resolver( m_control_ios ); 
@@ -309,9 +328,7 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
 
         // Count the total HLTs and each specific one
         ++m_total_hlt_counter;
-        for(size_t i = 0; i < m_hlt_range; i++) {
-          if( (hlt_word->trigger_word >> i) & 0x1 ) ++m_hlt_trigger_counter[i];
-        }
+        for (auto &hlt : m_hlt_trigger_counter) { if( (hlt_word->trigger_word >> hlt.first) & 0x1 ) ++hlt.second; }
       }
       else if (temp_word.word_type == content::word::t_lt)
       {
@@ -349,9 +366,7 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
         prev_prev_llt = prev_llt;
         prev_llt = { llt_word->timestamp, (llt_word->trigger_word & 0xFFFFFFFF) };
 
-        for(size_t i = 0; i < m_llt_range; i++) {
-          if( (llt_word->trigger_word >> i) & 0x1 ) ++m_llt_trigger_counter[i];
-        }
+        for (auto &llt : m_llt_trigger_counter) { if( (llt_word->trigger_word >> llt.first) & 0x1 ) ++llt.second; }
       }
       else if (temp_word.word_type == content::word::t_ch)
       {
@@ -677,52 +692,23 @@ void CTBModule::get_info(opmonlib::InfoCollector& ci, int /*level*/)
   module_info.average_buffer_occupancy = read_average_buffer_counts();
 
   module_info.total_hlt_count = m_total_hlt_counter.load();
-  module_info.ts_word_count = m_ts_word_counter.load();
+  module_info.ts_word_count = m_ts_word_counter.exchange(0);
 
-  // 15 HLTs
-  module_info.hlt_0_count  = m_hlt_trigger_counter[0].load();
-  module_info.hlt_1_count  = m_hlt_trigger_counter[1].load();
-  module_info.hlt_2_count  = m_hlt_trigger_counter[2].load();
-  module_info.hlt_3_count  = m_hlt_trigger_counter[3].load();
-  module_info.hlt_4_count  = m_hlt_trigger_counter[4].load();
-  module_info.hlt_5_count  = m_hlt_trigger_counter[5].load();
-  module_info.hlt_6_count  = m_hlt_trigger_counter[6].load();
-  module_info.hlt_7_count  = m_hlt_trigger_counter[7].load();
-  module_info.hlt_8_count  = m_hlt_trigger_counter[8].load();
-  module_info.hlt_9_count  = m_hlt_trigger_counter[9].load();
-  module_info.hlt_10_count = m_hlt_trigger_counter[10].load();
-  module_info.hlt_11_count = m_hlt_trigger_counter[11].load();
-  module_info.hlt_12_count = m_hlt_trigger_counter[12].load();
-  module_info.hlt_13_count = m_hlt_trigger_counter[13].load();
-  module_info.hlt_14_count = m_hlt_trigger_counter[14].load();
+  for (auto &hlt : m_hlt_trigger_counter) {
+    opmonlib::InfoCollector tmp_ic;
+    dunedaq::ctbmodules::ctbmoduleinfo::LevelTriggerInfo ti;
+    ti.count = hlt.second.exchange(0);
+    tmp_ic.add(ti);
+    ci.add("hlt_" + std::to_string(hlt.first), tmp_ic);
+  }
 
-  // 20 LLTs
-  module_info.llt_0_count  = m_llt_trigger_counter[0].load();
-  module_info.llt_1_count  = m_llt_trigger_counter[1].load();
-  module_info.llt_2_count  = m_llt_trigger_counter[2].load();
-  module_info.llt_3_count  = m_llt_trigger_counter[3].load();
-  module_info.llt_4_count  = m_llt_trigger_counter[4].load();
-  module_info.llt_5_count  = m_llt_trigger_counter[5].load();
-  module_info.llt_6_count  = m_llt_trigger_counter[6].load();
-  module_info.llt_7_count  = m_llt_trigger_counter[7].load();
-  module_info.llt_8_count  = m_llt_trigger_counter[8].load();
-  module_info.llt_9_count  = m_llt_trigger_counter[9].load();
-  module_info.llt_10_count = m_llt_trigger_counter[10].load();
-  module_info.llt_11_count = m_llt_trigger_counter[11].load();
-  module_info.llt_12_count = m_llt_trigger_counter[12].load();
-  module_info.llt_13_count = m_llt_trigger_counter[13].load();
-  module_info.llt_14_count = m_llt_trigger_counter[14].load();
-  module_info.llt_15_count = m_llt_trigger_counter[15].load();
-  module_info.llt_16_count = m_llt_trigger_counter[16].load();
-  module_info.llt_17_count = m_llt_trigger_counter[17].load();
-  module_info.llt_18_count = m_llt_trigger_counter[18].load();
-  module_info.llt_19_count = m_llt_trigger_counter[19].load();
-
-  // Reset counters
-  for(auto &hlt : m_hlt_trigger_counter) hlt.exchange(0);
-  for(auto &llt : m_llt_trigger_counter) llt.exchange(0);
-
-  m_ts_word_counter.exchange(0);
+  for (auto &llt : m_llt_trigger_counter) {
+    opmonlib::InfoCollector tmp_ic;
+    dunedaq::ctbmodules::ctbmoduleinfo::LevelTriggerInfo ti;
+    ti.count = llt.second.exchange(0);
+    tmp_ic.add(ti);
+    ci.add("llt_" + std::to_string(llt.first), tmp_ic);
+  }
 
   ci.add(module_info);
 }
