@@ -34,8 +34,11 @@ CTBModule::CTBModule(const std::string& name)
   : hsilibs::HSIEventSender(name)
   , m_is_running(false)
   , m_is_configured(false)
-  , m_n_TS_words(0)
   , m_error_state(false)
+  , m_total_hlt_counter(0)
+  , m_ts_word_counter(0) 
+  , m_hlt_trigger_counter(m_hlt_range)
+  , m_llt_trigger_counter(m_llt_range)
   , m_control_ios()
   , m_receiver_ios()
   , m_control_socket(m_control_ios)
@@ -247,7 +250,7 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
       
       //check if it is a TS word and increment the counter
       if ( IsTSWord( temp_word ) ) {
-        m_n_TS_words++ ;
+        ++m_ts_word_counter;
         TLOG_DEBUG(9) << "Received timestamp word! TS: "+temp_word.timestamp;
         prev_timestamp = temp_word.timestamp;
       }
@@ -300,6 +303,12 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
         // TODO properly fill device id
         dfmessages::HSIEvent event = dfmessages::HSIEvent(0x1, hlt_word->trigger_word, hlt_word->timestamp, m_run_HLT_counter, m_run_number);
         send_hsi_event(event);
+
+        // Count the total HLTs and each specific one
+        ++m_total_hlt_counter;
+        for(size_t i = 0; i < m_hlt_range; i++) {
+          if( (hlt_word->trigger_word >> i) & 0x1 ) ++m_hlt_trigger_counter[i];
+        }
       }
       else if (temp_word.word_type == content::word::t_lt)
       {
@@ -336,6 +345,10 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
         // store the previous 2 LLTs so we can match to the HLT
         prev_prev_llt = prev_llt;
         prev_llt = { llt_word->timestamp, (llt_word->trigger_word & 0xFFFFFFFF) };
+
+        for(size_t i = 0; i < m_llt_range; i++) {
+          if( (llt_word->trigger_word >> i) & 0x1 ) ++m_llt_trigger_counter[i];
+        }
       }
       else if (temp_word.word_type == content::word::t_ch)
       {
@@ -654,13 +667,59 @@ void CTBModule::get_info(opmonlib::InfoCollector& ci, int /*level*/)
   module_info.num_control_responses_received = m_num_control_responses_received.load();
   module_info.ctb_hardware_run_status = m_is_running; 
   module_info.ctb_hardware_configuration_status = m_is_configured;
-  module_info.num_ts_words_received = m_n_TS_words;
     
   module_info.last_readout_timestamp = m_last_readout_hlt_timestamp.load();
-  module_info.sent_hsi_events_counter = m_sent_counter.load();
   module_info.failed_to_send_hsi_events_counter = m_failed_to_send_counter.load();
   module_info.last_sent_timestamp = m_last_sent_timestamp.load();
   module_info.average_buffer_occupancy = read_average_buffer_counts();
+
+  module_info.total_hlt_count = m_total_hlt_counter.load();
+  module_info.ts_word_count = m_ts_word_counter.load();
+
+  // 15 HLTs
+  module_info.hlt_0_count  = m_hlt_trigger_counter[0].load();
+  module_info.hlt_1_count  = m_hlt_trigger_counter[1].load();
+  module_info.hlt_2_count  = m_hlt_trigger_counter[2].load();
+  module_info.hlt_3_count  = m_hlt_trigger_counter[3].load();
+  module_info.hlt_4_count  = m_hlt_trigger_counter[4].load();
+  module_info.hlt_5_count  = m_hlt_trigger_counter[5].load();
+  module_info.hlt_6_count  = m_hlt_trigger_counter[6].load();
+  module_info.hlt_7_count  = m_hlt_trigger_counter[7].load();
+  module_info.hlt_8_count  = m_hlt_trigger_counter[8].load();
+  module_info.hlt_9_count  = m_hlt_trigger_counter[9].load();
+  module_info.hlt_10_count = m_hlt_trigger_counter[10].load();
+  module_info.hlt_11_count = m_hlt_trigger_counter[11].load();
+  module_info.hlt_12_count = m_hlt_trigger_counter[12].load();
+  module_info.hlt_13_count = m_hlt_trigger_counter[13].load();
+  module_info.hlt_14_count = m_hlt_trigger_counter[14].load();
+
+  // 20 LLTs
+  module_info.llt_0_count  = m_llt_trigger_counter[0].load();
+  module_info.llt_1_count  = m_llt_trigger_counter[1].load();
+  module_info.llt_2_count  = m_llt_trigger_counter[2].load();
+  module_info.llt_3_count  = m_llt_trigger_counter[3].load();
+  module_info.llt_4_count  = m_llt_trigger_counter[4].load();
+  module_info.llt_5_count  = m_llt_trigger_counter[5].load();
+  module_info.llt_6_count  = m_llt_trigger_counter[6].load();
+  module_info.llt_7_count  = m_llt_trigger_counter[7].load();
+  module_info.llt_8_count  = m_llt_trigger_counter[8].load();
+  module_info.llt_9_count  = m_llt_trigger_counter[9].load();
+  module_info.llt_10_count = m_llt_trigger_counter[10].load();
+  module_info.llt_11_count = m_llt_trigger_counter[11].load();
+  module_info.llt_12_count = m_llt_trigger_counter[12].load();
+  module_info.llt_13_count = m_llt_trigger_counter[13].load();
+  module_info.llt_14_count = m_llt_trigger_counter[14].load();
+  module_info.llt_15_count = m_llt_trigger_counter[15].load();
+  module_info.llt_16_count = m_llt_trigger_counter[16].load();
+  module_info.llt_17_count = m_llt_trigger_counter[17].load();
+  module_info.llt_18_count = m_llt_trigger_counter[18].load();
+  module_info.llt_19_count = m_llt_trigger_counter[19].load();
+
+  // Reset counters
+  for(auto &hlt : m_hlt_trigger_counter) hlt.exchange(0);
+  for(auto &llt : m_llt_trigger_counter) llt.exchange(0);
+
+  m_ts_word_counter.exchange(0);
 
   ci.add(module_info);
 }
