@@ -93,6 +93,9 @@ CTBModule::do_configure(const data_t& args)
   // Initialise monitoring variables
   m_num_control_messages_sent = 0;
   m_num_control_responses_received = 0;
+  m_ts_word_counter.exchange = 0;
+  for(auto &hlt : m_hlt_trigger_counter) hlt = 0;
+  for(auto &llt : m_llt_trigger_counter) llt = 0;
 
   // network connection to ctb hardware control
   boost::asio::ip::tcp::resolver resolver( m_control_ios ); 
