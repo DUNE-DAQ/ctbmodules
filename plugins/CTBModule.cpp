@@ -354,6 +354,8 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
         prev_channel = { ((prev_timestamp & 0xF000000000000000) | ch_stat_word->timestamp),  ((ch_stat_pds << 48) | (ch_stat_crt << 16) | ch_stat_beam) };
       }
 
+      if (!running_flag.load()) break;
+
     } // n_words loop
 
     if ( connection_closed ){
