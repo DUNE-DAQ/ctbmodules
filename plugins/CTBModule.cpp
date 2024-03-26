@@ -33,6 +33,7 @@ namespace ctbmodules {
 CTBModule::CTBModule(const std::string& name)
   : hsilibs::HSIEventSender(name)
   , m_is_running(false)
+  , m_stop_requested(false)
   , m_is_configured(false)
   , m_error_state(false)
   , m_total_hlt_counter(0)
@@ -153,6 +154,9 @@ CTBModule::do_start(const nlohmann::json& startobj)
 
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering do_start() method";
 
+  // Set this to false early so it doesn't interfere with the start
+  m_stop_requested.store(false);
+
   auto start_params = startobj.get<rcif::cmd::StartParams>();
   m_run_number.store(start_params.run);
 
@@ -164,8 +168,6 @@ CTBModule::do_start(const nlohmann::json& startobj)
     run << "run" << start_params.run;
     SetCalibrationStream(run.str()) ;
   }
-
-
 
   if ( send_message( "{\"command\":\"StartRun\"}" )  ) {
     m_is_running.store(true);
@@ -185,10 +187,14 @@ CTBModule::do_stop(const nlohmann::json& /*stopobj*/)
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering do_stop() method";
 
   TLOG_DEBUG(0) << get_name() << ": Sending stop run command" << std::endl;
+    
+  // Give the do_work thread a chance to stop before stopping the CTB,
+  // otherwise we end up reading from an empty buffer
+  m_stop_requested.store(true);
+  std::this_thread::sleep_for(std::chrono::milliseconds(2));
 
   if(send_message( "{\"command\":\"StopRun\"}" ) ){
     TLOG_DEBUG(1) << get_name() << ": successfully stopped";
-
     m_is_running.store( false ) ;
   }
   else{
@@ -223,7 +229,7 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
 
   std::future<void> accepting = async( std::launch::async, [&]{ acceptor.accept(m_receiver_socket) ; } ) ;
 
-  while ( running_flag.load() ) {
+  while ( running_flag.load() && !m_stop_requested.load() ) {
     if ( accepting.wait_for( m_timeout ) == std::future_status::ready ){
       break ;
     }
@@ -241,7 +247,7 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
   uint64_t prev_timestamp = 0;
   std::pair<uint64_t,uint64_t> prev_channel, prev_prev_channel, prev_llt, prev_prev_llt; // pair<timestamp, trigger_payload>
 
-  while (running_flag.load()) {
+  while (running_flag.load() && !m_stop_requested.load()) {
 
     update_calibration_file();
 
@@ -259,6 +265,11 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
     update_buffer_counts(n_words);
 
     for ( unsigned int i = 0 ; i < n_words ; ++i ) {
+      
+      if (!running_flag.load() || m_stop_requested.load()) {
+        break;
+      }
+
       //read a word
       if ( ! read( temp_word ) ) {
         connection_closed = true ;
@@ -385,14 +396,17 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
         prev_channel = { ((prev_timestamp & 0xF000000000000000) | ch_stat_word->timestamp),  ((ch_stat_pds << 48) | (ch_stat_crt << 16) | ch_stat_beam) };
       }
 
-      if (!running_flag.load()) break;
-
     } // n_words loop
 
     if ( connection_closed ){
       break ;
     }
   }
+
+  // Make sure CTB run stops before closing socket
+  while ( m_is_running.load() ) {
+    std::this_thread::sleep_for(std::chrono::microseconds(100));
+  } 
 
   boost::system::error_code closing_error;
 

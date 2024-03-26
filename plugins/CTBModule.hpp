@@ -71,6 +71,7 @@ private:
   // control and monitoring variables
 
   std::atomic<bool> m_is_running;
+  std::atomic<bool> m_stop_requested;
   std::atomic<bool> m_is_configured;
 
   /*const */unsigned int m_receiver_port;
