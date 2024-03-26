@@ -157,7 +157,7 @@ def get_ctb_hsi_app(
     mgraph.add_endpoint(f"timesync_ctb_llt", f"ctb_llt_datahandler.timesync_output", "TimeSync", Direction.OUT, is_pubsub=True, toposort=False)
     mgraph.add_endpoint(f"timesync_ctb_hlt", f"ctb_hlt_datahandler.timesync_output", "TimeSync", Direction.OUT, is_pubsub=True, toposort=False)
 
-    mgraph.add_endpoint("hsievents", f"{nickname}.hsievents", "HSIEvent",    Direction.OUT)
+    mgraph.add_endpoint("ctb_hsievents", f"{nickname}.hsievents", "HSIEvent",    Direction.OUT)
 
     # dummy subscriber
     mgraph.add_endpoint(None, None, data_type="TimeSync", inout=Direction.IN, is_pubsub=True)
