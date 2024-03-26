@@ -160,6 +160,8 @@ CTBModule::do_start(const nlohmann::json& startobj)
   auto start_params = startobj.get<rcif::cmd::StartParams>();
   m_run_number.store(start_params.run);
 
+  m_total_hlt_counter.store(0);
+
   TLOG_DEBUG(0) << get_name() << ": Sending start of run command";
   m_thread_.start_working_thread();
 
