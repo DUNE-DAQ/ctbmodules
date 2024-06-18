@@ -310,7 +310,8 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
 
         m_last_readout_hlt_timestamp = hlt_word->timestamp;
         // Now find the associated LLT
-        llt_payload = MatchTriggerInput( hlt_word->timestamp, prev_llt, prev_prev_llt, true );
+        // if HLT0, skip matching
+        llt_payload = MatchTriggerInput( hlt_word, prev_llt, prev_prev_llt, true );
     
         // Send HSI data to a DLH 
         std::array<uint32_t, 7> hsi_struct;
@@ -350,7 +351,7 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
         content::word::trigger_t * llt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word ) ;
 
         // Find the matching channel status word
-        channel_payload = MatchTriggerInput( llt_word->timestamp, prev_channel, prev_prev_channel, false );
+        channel_payload = MatchTriggerInput( llt_word, prev_channel, prev_prev_channel, false );
   
         // Send HSI data to a DLH 
         std::array<uint32_t, 7> hsi_struct;
@@ -465,11 +466,13 @@ bool CTBModule::read( T &obj) {
   return true ;
 }
 
-uint64_t CTBModule::MatchTriggerInput( const uint64_t trigger_ts, const std::pair<uint64_t,uint64_t> &prev_input, const std::pair<uint64_t,uint64_t> &prev_prev_input, bool hlt_matching) noexcept {
+uint64_t CTBModule::MatchTriggerInput(const content::word::trigger_t * trigger, const std::pair<uint64_t,uint64_t> &prev_input, const std::pair<uint64_t,uint64_t> &prev_prev_input, bool hlt_matching) noexcept {
  
   // The first condition should be true the majority of the time and the "else" should never happen.
   // Find the matching word whcih caused the LLT or HLT and return its payload
-
+  uint64_t trigger_ts = trigger->timestamp;
+  uint64_t trigger_word = trigger->trigger_word;
+  
   if ( trigger_ts == prev_input.first + 1 ) { 
     return prev_input.second; 
   } 
@@ -479,7 +482,11 @@ uint64_t CTBModule::MatchTriggerInput( const uint64_t trigger_ts, const std::pai
   else {
     std::stringstream msg;
     if ( hlt_matching ) { 
-      msg << "No LLT match found for HLT TS " << trigger_ts << " (LLT TS prev=" 
+      if (trigger_word == 0x1 || trigger_word == (0x1<<16)) {
+        // we don't care if fake trigger (HLT0) or the pulse train (HLT 16) have no matching LLTs
+        return 0;
+      }
+      msg << "No LLT m/atch found for HLT TS " << trigger_ts << " (LLT TS prev=" 
           << prev_input.first << " prev_prev=" << prev_prev_input.first << ")";
     } 
     else {
