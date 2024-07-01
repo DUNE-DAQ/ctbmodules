@@ -10,7 +10,6 @@
 #include "CTBModule.hpp"
 #include "CTBModuleIssues.hpp"
 
-#include "appfwk/DAQModuleHelper.hpp"
 #include "iomanager/IOManager.hpp"
 #include "logging/Logging.hpp"
 #include "rcif/cmd/Nljs.hpp"
@@ -69,10 +68,28 @@ CTBModule::~CTBModule(){
 }
 
 void
-CTBModule::init(const nlohmann::json& init_data)
+CTBModule::init(std::shared_ptr<appfwk::ModuleConfiguration> mcfg)
 {
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering init() method";
-  HSIEventSender::init(init_data);
+  HSIEventSender::init(mcfg);
+
+  /*
+  auto mdal = mcfg->module<appmodel::FakeHSIEventGeneratorModule>(get_name()); // Only need generic DaqModule for output
+
+  if (!mdal) {
+    throw appfwk::CommandFailed(ERS_HERE, "init", get_name(), "Unable to retrieve configuration object");
+  }
+
+  for (auto con : mdal->get_outputs()) {
+    if (con->get_data_type() == datatype_to_string<HSI_FRAME_STRUCT>()) {
+
+      m_raw_hsi_data_sender = get_iom_sender<HSI_FRAME_STRUCT>(con->UID());
+    }
+  }
+
+  m_params = mdal->get_configuration();
+  */
+  
   m_llt_hsi_data_sender = get_iom_sender<dunedaq::hsilibs::HSI_FRAME_STRUCT>(appfwk::connection_uid(init_data, "llt_output"));
   m_hlt_hsi_data_sender = get_iom_sender<dunedaq::hsilibs::HSI_FRAME_STRUCT>(appfwk::connection_uid(init_data, "hlt_output"));
 

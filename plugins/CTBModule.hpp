@@ -57,7 +57,7 @@ public:
   CTBModule(CTBModule&&) = delete;                 ///< CTBModule is not move-constructible
   CTBModule& operator=(CTBModule&&) = delete;      ///< CTBModule is not move-assignable
 
-  void init(const nlohmann::json& iniobj) override;
+  void init(std::shared_ptr<appfwk::ModuleConfiguration> mcfg) override;
 
   static uint64_t MatchTriggerInput(const content::word::trigger_t * trigger, const std::pair<uint64_t,uint64_t> &prev_input, const std::pair<uint64_t,uint64_t> &prev_prev_input, bool hlt_matching) noexcept;
   static bool IsTSWord( const content::word::word_t &w ) noexcept;
