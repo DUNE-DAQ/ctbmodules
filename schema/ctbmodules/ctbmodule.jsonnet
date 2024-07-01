@@ -65,7 +65,7 @@ local ctbmodule = {
     ], doc="Central Trigger Board Pulser Configuration"),
 
     timing: s.record("Timing",  [
-        s.field("address", self.string, "0xF0"),
+        s.field("address", self.string, "0xF"),
         s.field("group", self.string, "0x0"),
         s.field("triggers", self.boolean, true),
         s.field("lockout", self.string, "0x10"),
