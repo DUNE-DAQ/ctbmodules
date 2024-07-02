@@ -40,6 +40,8 @@
 namespace dunedaq {
 namespace ctbmodules {
 
+typedef std::pair<uint64_t,uint64_t> ts_payload;
+
 /**
  * @brief CTBModule provides the command and readout interface to the Central Trigger Board hardware
  */
@@ -60,7 +62,6 @@ public:
 
   void init(const nlohmann::json& iniobj) override;
 
-  static uint64_t MatchTriggerInput(const content::word::trigger_t * trigger, const std::pair<uint64_t,uint64_t> &prev_input, const std::pair<uint64_t,uint64_t> &prev_prev_input, bool hlt_matching) noexcept;
   static bool IsTSWord( const content::word::word_t &w ) noexcept;
   static bool IsFeedbackWord( const content::word::word_t &w ) noexcept;
   bool ErrorState() const { return m_error_state.load() ; } 
@@ -115,7 +116,11 @@ private:
   // Threading
   dunedaq::utilities::WorkerThread m_thread_;
   void do_hsi_work(std::atomic<bool>&);
-  void send_trigger_word(content::word::trigger_t *, uint64_t);
+
+  // Generate HSI Frame/Event
+  void send_matched_trigger_word(content::word::trigger_t&, uint64_t);
+  void match_between_buffers(std::queue<content::word::trigger_t>&, std::queue<ts_payload>&, uint64_t);
+  
 
   template<typename T>
   bool read(T &obj);
