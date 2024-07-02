@@ -36,6 +36,7 @@
 #include <boost/asio.hpp>
 #include <boost/array.hpp>
 
+
 namespace dunedaq {
 namespace ctbmodules {
 
@@ -114,6 +115,7 @@ private:
   // Threading
   dunedaq::utilities::WorkerThread m_thread_;
   void do_hsi_work(std::atomic<bool>&);
+  void send_trigger_word(content::word::trigger_t *, uint64_t);
 
   template<typename T>
   bool read(T &obj);

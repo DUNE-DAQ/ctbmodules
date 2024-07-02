@@ -26,6 +26,10 @@
 #define TRACE_NAME "CTBModule" // NOLINT
 #define TLVL_ENTER_EXIT_METHODS 10
 #define TLVL_CTB_MODULE 15
+#define CTB_HSI_FRAME_VERSION 0x1
+#define CTB_HSI_DET_ID 0x1
+#define CTB_HSI_CRATE_ID 0x0
+#define CTB_HSI_SLOT_ID 0x0
 
 namespace dunedaq {
 namespace ctbmodules {
@@ -312,33 +316,9 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
         // Now find the associated LLT
         // if HLT0, skip matching
         llt_payload = MatchTriggerInput( hlt_word, prev_llt, prev_prev_llt, true );
+        
+        send_trigger_word(hlt_word, llt_payload);
     
-        // Send HSI data to a DLH 
-        std::array<uint32_t, 7> hsi_struct;
-        hsi_struct[0] = (0x1 << 26) | (0x1 << 6) | 0x1; // DAQHeader, frame version: 1, det id: 1, link for low level 0, link for high level 1, leave slot and crate as 0
-        hsi_struct[1] = hlt_word->timestamp;       // ts low
-        hsi_struct[2] = hlt_word->timestamp >> 32; // ts high
-        hsi_struct[3] = llt_payload;               // lower 32b 
-        hsi_struct[4] = 0x0;                       // max 32 llts so these bits will always be 0x0
-        hsi_struct[5] = hlt_word->trigger_word;    // trigger_map;
-        hsi_struct[6] = m_run_HLT_counter;         // m_generated_counter;
-  
-        TLOG_DEBUG(4) << get_name() << ": Formed HSI_FRAME_STRUCT for hlt "
-              << std::hex 
-              << "0x"   << hsi_struct[0]
-              << ", 0x" << hsi_struct[1]
-              << ", 0x" << hsi_struct[2]
-              << ", 0x" << hsi_struct[3]
-              << ", 0x" << hsi_struct[4]
-              << ", 0x" << hsi_struct[5]
-              << ", 0x" << hsi_struct[6]
-              << "\n";
-  
-        send_raw_hsi_data(hsi_struct, m_hlt_hsi_data_sender.get());
-
-        // TODO properly fill device id
-        dfmessages::HSIEvent event = dfmessages::HSIEvent(0x1, hlt_word->trigger_word, hlt_word->timestamp, m_run_HLT_counter, m_run_number);
-        send_hsi_event(event);
 
         // Count the total HLTs and each specific one
         ++m_total_hlt_counter;
@@ -352,29 +332,8 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
 
         // Find the matching channel status word
         channel_payload = MatchTriggerInput( llt_word, prev_channel, prev_prev_channel, false );
-  
-        // Send HSI data to a DLH 
-        std::array<uint32_t, 7> hsi_struct;
-        hsi_struct[0] = (0x1 << 6) | 0x1; // DAQHeader, frame version: 1, det id: 1, link for low level 0, link for high level 1, leave slot and crate as 0
-        hsi_struct[1] = llt_word->timestamp;       // ts low
-        hsi_struct[2] = llt_word->timestamp >> 32; // ts high
-        hsi_struct[3] = channel_payload;           // channel raw input lower 32b
-        hsi_struct[4] = channel_payload >> 32;     // channelraw input upper 32b
-        hsi_struct[5] = llt_word->trigger_word;    // trigger_map;
-        hsi_struct[6] = m_run_LLT_counter;         // m_generated_counter;
-  
-        TLOG_DEBUG(6) << get_name() << ": Formed HSI_FRAME_STRUCT for llt "
-              << std::hex 
-              << "0x"   << hsi_struct[0]
-              << ", 0x" << hsi_struct[1]
-              << ", 0x" << hsi_struct[2]
-              << ", 0x" << hsi_struct[3]
-              << ", 0x" << hsi_struct[4]
-              << ", 0x" << hsi_struct[5]
-              << ", 0x" << hsi_struct[6]
-              << "\n";
-
-        send_raw_hsi_data(hsi_struct, m_llt_hsi_data_sender.get());
+        
+        send_trigger_word(llt_word, channel_payload);
 
         // store the previous 2 LLTs so we can match to the HLT
         prev_prev_llt = prev_llt;
@@ -438,6 +397,45 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
   
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Exiting do_work() method";
 
+}
+
+void CTBModule::send_trigger_word(content::word::trigger_t* word, uint64_t payload) {
+  // Send HSI data to a DLH
+  std::array<uint32_t, 7> hsi_struct;
+  bool is_hlt = word->IsHLT();
+  hsi_struct[0] = (is_hlt << 26)            |  // link
+                  (CTB_HSI_SLOT_ID << 22)   |  
+                  (CTB_HSI_CRATE_ID << 12)  | 
+                  (CTB_HSI_DET_ID << 6)     |
+                  CTB_HSI_FRAME_VERSION
+                  ;
+  hsi_struct[1] = word->timestamp;        // ts low
+  hsi_struct[2] = word->timestamp >> 32;  // ts high
+  hsi_struct[3] = payload;                // lower 32b
+  hsi_struct[4] = payload >> 32;          // upper 32b (will be 0x0 for llt payloads)
+  hsi_struct[5] = word->trigger_word;     // trigger_map;
+  hsi_struct[6] = is_hlt ? m_run_HLT_counter : m_run_LLT_counter; // m_generated_counter;
+  int dbg_lvl = is_hlt ? 4 : 6;
+  TLOG_DEBUG(dbg_lvl) << get_name() << ": Formed HSI_FRAME_STRUCT for" << (is_hlt? "HLT" : "LLT")
+      << std::hex 
+      << "0x"   << hsi_struct[0]
+      << ", 0x" << hsi_struct[1]
+      << ", 0x" << hsi_struct[2]
+      << ", 0x" << hsi_struct[3]
+      << ", 0x" << hsi_struct[4]
+      << ", 0x" << hsi_struct[5]
+      << ", 0x" << hsi_struct[6]
+      << "\n";
+  if (is_hlt) {
+    send_raw_hsi_data(hsi_struct, m_hlt_hsi_data_sender.get());
+    // TODO properly fill device id
+    dfmessages::HSIEvent event(0x1, word->trigger_word, word->timestamp, m_run_HLT_counter, m_run_number);
+    send_hsi_event(event);
+  }
+  else {
+    send_raw_hsi_data(hsi_struct, m_llt_hsi_data_sender.get());
+  }
+  
 }
 
 
