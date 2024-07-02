@@ -72,26 +72,34 @@ CTBModule::init(std::shared_ptr<appfwk::ModuleConfiguration> mcfg)
 {
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering init() method";
   HSIEventSender::init(mcfg);
+  
+  m_cfg = mcfg->module<appmodel::CTBModule>(get_name());
 
-  /*
-  auto mdal = mcfg->module<appmodel::FakeHSIEventGeneratorModule>(get_name()); // Only need generic DaqModule for output
-
-  if (!mdal) {
+  if (!m_cfg) {
     throw appfwk::CommandFailed(ERS_HERE, "init", get_name(), "Unable to retrieve configuration object");
   }
 
-  for (auto con : mdal->get_outputs()) {
-    if (con->get_data_type() == datatype_to_string<HSI_FRAME_STRUCT>()) {
+  m_llt_hsi_data_sender.reset();
+  m_hlt_hsi_data_sender.reset(); 
 
-      m_raw_hsi_data_sender = get_iom_sender<HSI_FRAME_STRUCT>(con->UID());
+  for (auto con : m_cfg->get_outputs()) {
+    if (con->get_data_type() == datatype_to_string<dunedaq::hsilibs::HSI_FRAME_STRUCT>()) {
+      if (con->UID().find("llt") != std::string::npos) {
+	m_llt_hsi_data_sender = get_iom_sender<dunedaq::hsilibs::HSI_FRAME_STRUCT>(con->UID());
+      }
+      if (con->UID().find("hlt") != std::string::npos) {
+	m_hlt_hsi_data_sender = get_iom_sender<dunedaq::hsilibs::HSI_FRAME_STRUCT>(con->UID());
+      }
     }
   }
 
-  m_params = mdal->get_configuration();
-  */
-  
-  m_llt_hsi_data_sender = get_iom_sender<dunedaq::hsilibs::HSI_FRAME_STRUCT>(appfwk::connection_uid(init_data, "llt_output"));
-  m_hlt_hsi_data_sender = get_iom_sender<dunedaq::hsilibs::HSI_FRAME_STRUCT>(appfwk::connection_uid(init_data, "hlt_output"));
+  if ( ! m_llt_hsi_data_sender ) {
+    // throw that the sender is not onfigured
+  }
+
+  if ( ! m_hlt_hsi_data_sender ) {
+    // throw that the sender is not onfigured
+  }
 
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Exiting init() method";
 }

@@ -23,8 +23,7 @@
 
 #include "CTBPacketContent.hpp"
 
-#include "ctbmodules/ctbmodule/Nljs.hpp"
-#include "ctbmodules/ctbmoduleinfo/InfoNljs.hpp"
+#include "appmodel/CTBModule.hpp"
 
 #include <memory>
 #include <string>
@@ -108,7 +107,7 @@ private:
   bool send_message(const std::string & msg);
 
   // Configuration
-  dunedaq::ctbmodules::ctbmodule::Conf m_cfg;
+  const appmodel::CTBModule * m_cfg = nullptr;
   std::atomic<daqdataformats::run_number_t> m_run_number;
 
   // Threading
