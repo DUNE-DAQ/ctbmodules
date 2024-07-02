@@ -440,7 +440,7 @@ void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_
       std::stringstream msg;
       msg << "Time out while waiting for a match for the "<< (is_hlt? "HLT" : "LLT")
           << ": TS = " << trigger_ts << ", trigger word = " << trigger_word;
-      ers::warning(CTBWordMatchError(ERS_HERE, msg.str()));
+      ers::warning(CTBWordMatchWarning(ERS_HERE, msg.str()));
       buf_a.pop();
       continue;
     }
@@ -464,10 +464,10 @@ void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_
           std::stringstream msg;
           msg << "No match found for " << (is_hlt? "HLT" : "LLT")
               << ": TS = " << trigger_ts << ", trigger word = " << trigger_word;
-          ers::warning(CTBWordMatchError(ERS_HERE, msg.str()));
+          ers::warning(CTBWordMatchWarning(ERS_HERE, msg.str()));
         }
         buf_a.pop();
-        continue;
+        break;
       }
     } // end loop buf_b
   }
