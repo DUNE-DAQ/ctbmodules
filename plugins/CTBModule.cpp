@@ -134,12 +134,6 @@ CTBModule::do_configure(const data_t& args)
     m_calibration_file_interval = std::chrono::minutes(m_cfg.calibration_update); 
   }
 
-  if ( m_cfg.run_trigger_output != "" ) {
-    m_has_run_trigger_report = true ; 
-    m_run_trigger_dir = m_cfg.run_trigger_output;
-    if ( m_run_trigger_dir.back() != '/' ) m_run_trigger_dir += '/' ;
-  }
-
   // create the json string
   nlohmann::json config;
   to_json(config, m_cfg.board_config);
@@ -202,7 +196,6 @@ CTBModule::do_stop(const nlohmann::json& /*stopobj*/)
   else{
     throw CTBCommunicationError(ERS_HERE, "Unable to stop CTB");
   }
-  store_run_trigger_counters( m_run_number ) ; 
   m_thread_.stop_working_thread();
 
   m_run_HLT_counter=0;
@@ -564,26 +557,6 @@ bool CTBModule::SetCalibrationStream( const std::string & prefix ) {
   } 
   // possibly we could check here if the directory is valid and  writable before assuming the calibration stream is valid
   return true ;
-
-}
-
-bool CTBModule::store_run_trigger_counters( unsigned int run_number, const std::string & prefix) const {
-
-  if ( ! m_has_run_trigger_report ) {
-    return false ;
-  }
-
-  std::stringstream out_name ;
-  out_name << m_run_trigger_dir << prefix << "run_" << run_number << "_triggers.txt";
-  std::ofstream out( out_name.str() ) ;
-  out << "Good Part\t " << m_run_gool_part_counter << std::endl 
-      << "Total HLT\t " << m_run_HLT_counter << std::endl ;
-
-  for ( unsigned int i = 0; i < m_metric_HLT_names.size() ; ++i ) {
-    out << "HLT " << i << " \t " << m_run_HLT_counters[i] << std::endl ;
-  }
-
-  return true; 
 
 }
 

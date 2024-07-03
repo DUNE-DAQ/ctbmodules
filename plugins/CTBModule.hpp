@@ -131,33 +131,12 @@ private:
   std::ofstream m_calibration_file;
   std::chrono::steady_clock::time_point m_last_calibration_file_update;
 
-  // members related to run trigger report
-
-  bool m_has_run_trigger_report = false;
-  std::string m_run_trigger_dir = "";
-  bool store_run_trigger_counters( unsigned int run_number, const std::string & prefix = "" ) const;
-
-
-  std::atomic<unsigned long> m_run_gool_part_counter = 0;
+  // metric utilities
   std::atomic<unsigned long> m_run_HLT_counter = 0;
-  // TODO should be atomic?
-  unsigned long m_run_HLT_counters[8] = {0};
   std::atomic<unsigned long> m_run_LLT_counter;
   std::atomic<unsigned long> m_run_channel_status_counter = 0;
-  // metric utilities
-
-  const std::array<std::string, 8> m_metric_HLT_names  = { "CTB_HLT_0_rate",
-                                                            "CTB_HLT_1_rate", 
-                                                            "CTB_HLT_2_rate",
-                                                            "CTB_HLT_3_rate",
-                                                            "CTB_HLT_4_rate",
-                                                            "CTB_HLT_5_rate",
-                                                            "CTB_HLT_6_rate",
-                                                            "CTB_HLT_7_rate" };
-
 
   // monitoring
-
   std::deque<uint> m_buffer_counts; // NOLINT(build/unsigned)
   std::shared_mutex m_buffer_counts_mutex;
   void update_buffer_counts(uint new_count); // NOLINT(build/unsigned)

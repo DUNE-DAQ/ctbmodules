@@ -231,9 +231,6 @@ local ctbmodule = {
 
         s.field("calibration_update", self.uint8, "5",
                 doc="CTB Calibration Update Interval"),
-
-        s.field("run_trigger_output", self.string, "/nfs/sw/trigger/counters",
-                doc="CTB Trigger Output Path"),
  
         s.field("board_config", self.board_config, self.board_config, doc="CTB board config"),
 
