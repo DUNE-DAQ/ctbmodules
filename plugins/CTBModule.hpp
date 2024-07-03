@@ -173,6 +173,7 @@ private:
   std::atomic<int> m_num_control_messages_sent;
   std::atomic<int> m_num_control_responses_received;
   std::atomic<uint64_t> m_last_readout_hlt_timestamp; // NOLINT(build/unsigned)
+  std::atomic<uint64_t> m_last_readout_llt_timestamp; // NOLINT(build/unsigned)
 
 };
 } // namespace ctbmodule

@@ -56,6 +56,7 @@ CTBModule::CTBModule(const std::string& name)
   , m_num_control_messages_sent(0)
   , m_num_control_responses_received(0)
   , m_last_readout_hlt_timestamp(0)
+  , m_last_readout_llt_timestamp(0)
 {
   register_command("conf", &CTBModule::do_configure);
   register_command("start", &CTBModule::do_start);
@@ -250,6 +251,9 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
   bool connection_closed = false ;
   uint64_t ch_stat_beam, ch_stat_crt, ch_stat_pds;
   uint64_t prev_timestamp = 0;
+  // buffers for word matching. buf_a are the trigger words, buf_b are corresponding payloads
+  std::queue<content::word::trigger_t> match_buf_a_hlts, match_buf_a_llts;
+  std::queue<ts_payload> match_buf_b_llts, match_buf_b_chstatus;
 
   while (running_flag.load() && !m_stop_requested.load()) {
 
@@ -267,9 +271,6 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
     // read n words as requested from the header
     
     update_buffer_counts(n_words);
-    // buffers for word matching. buf_a are the trigger words, buf_b are corresponding payloads
-    std::queue<content::word::trigger_t> match_buf_a_hlts, match_buf_a_llts;
-    std::queue<ts_payload> match_buf_b_llts, match_buf_b_chstatus;
 
     for ( unsigned int i = 0 ; i < n_words ; ++i ) {
       
@@ -328,6 +329,7 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
 
         ++m_run_LLT_counter;
         for (auto &llt : m_llt_trigger_counter) { if( (llt_word->trigger_word >> llt.first) & 0x1 ) ++llt.second; }
+        m_last_readout_llt_timestamp = temp_word.timestamp;
       }
       else if (temp_word.word_type == content::word::t_ch)
       {
@@ -348,7 +350,7 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
       }
       // do matching
       match_between_buffers(match_buf_a_hlts, match_buf_b_llts, m_last_readout_hlt_timestamp.load());
-      match_between_buffers(match_buf_a_llts, match_buf_b_chstatus, m_last_readout_hlt_timestamp.load());
+      match_between_buffers(match_buf_a_llts, match_buf_b_chstatus, m_last_readout_llt_timestamp.load());
 
     } // n_words loop
 
@@ -408,7 +410,7 @@ void CTBModule::send_matched_trigger_word(content::word::trigger_t& word, uint64
   hsi_struct[5] = word.trigger_word;     // trigger_map;
   hsi_struct[6] = is_hlt ? m_run_HLT_counter : m_run_LLT_counter; // m_generated_counter;
   int dbg_lvl = is_hlt ? 4 : 6;
-  TLOG_DEBUG(dbg_lvl) << get_name() << ": Formed HSI_FRAME_STRUCT for" << (is_hlt? "HLT" : "LLT")
+  TLOG_DEBUG(dbg_lvl) << get_name() << ": Formed HSI_FRAME_STRUCT for " << (is_hlt? "HLT" : "LLT")
       << std::hex 
       << "0x"   << hsi_struct[0]
       << ", 0x" << hsi_struct[1]
@@ -436,10 +438,11 @@ void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_
     bool is_hlt = trigger.IsHLT();
     uint64_t trigger_ts = trigger.timestamp;
     uint64_t trigger_word = trigger.trigger_word;
-    if ((timeout_reference - trigger_ts) > 100) {
+    if (timeout_reference > (trigger_ts + 100)) {
       std::stringstream msg;
       msg << "Time out while waiting for a match for the "<< (is_hlt? "HLT" : "LLT")
-          << ": TS = " << trigger_ts << ", trigger word = " << trigger_word;
+          << ": TS = " << trigger_ts << ", trigger word = " << trigger_word
+          << " Timeout reference: " << timeout_reference;
       ers::warning(CTBWordMatchWarning(ERS_HERE, msg.str()));
       buf_a.pop();
       continue;
@@ -457,7 +460,7 @@ void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_
         break;
       }
       else { // buf_b is already past the match window. No matching is found, error!
-        if (is_hlt && (trigger_word == 0x1 || trigger_word == (0x1<< 16))) { // Fake HLTs, no matching is OK
+        if (is_hlt && (trigger_word == 0x1 || trigger_word == (0x1 << 16))) { // Fake HLTs, no matching is OK
           send_matched_trigger_word(trigger, 0);
         } 
         else{
@@ -470,7 +473,9 @@ void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_
         break;
       }
     } // end loop buf_b
-  }
+  } // end loop buf_a
+  // Don't let buf_b get too long (e.g. when LLT rate is high but HLT rate is low)
+  while (buf_b.size() > 32) buf_b.pop();
 }
 
 
