@@ -56,7 +56,6 @@ CTBModule::CTBModule(const std::string& name)
   , m_num_control_messages_sent(0)
   , m_num_control_responses_received(0)
   , m_last_readout_hlt_timestamp(0)
-  , m_last_readout_llt_timestamp(0)
 {
   register_command("conf", &CTBModule::do_configure);
   register_command("start", &CTBModule::do_start);
@@ -251,6 +250,8 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
   bool connection_closed = false ;
   uint64_t ch_stat_beam, ch_stat_crt, ch_stat_pds;
   uint64_t prev_timestamp = 0;
+  ts_payload prev_hlt, prev_llt, prev_ch_stat;
+  ts_payload curr_hlt, curr_llt, curr_ch_stat;
   // buffers for word matching. buf_a are the trigger words, buf_b are corresponding payloads
   std::queue<content::word::trigger_t> match_buf_a_hlts, match_buf_a_llts;
   std::queue<ts_payload> match_buf_b_llts, match_buf_b_chstatus;
@@ -310,47 +311,54 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
                                                   << " \t Padding -> " << feedback -> padding << std::dec << std::endl ;
       } else if (temp_word.word_type == content::word::t_gt)
       {
-        TLOG_DEBUG(3) << "Received HLT word!";
-        content::word::trigger_t * hlt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word ) ;
+        TLOG_DEBUG(3) << "Received HLT word! TS: " + temp_word.timestamp;
+        content::word::trigger_t * hlt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word );
+        curr_hlt = {hlt_word->timestamp, (hlt_word->trigger_word & 0x1FFFFFFFFFFFFFFF)};
+        if (check_repeated_word(curr_hlt, prev_hlt, temp_word.word_type)) continue;
         match_buf_a_hlts.push(*hlt_word);
-
         // Count the total HLTs and each specific one
         ++m_run_HLT_counter;
         ++m_total_hlt_counter;
         for (auto &hlt : m_hlt_trigger_counter) { if( (hlt_word->trigger_word >> hlt.first) & 0x1 ) ++hlt.second; }
         m_last_readout_hlt_timestamp = temp_word.timestamp;
+        prev_hlt = curr_hlt;
       }
       else if (temp_word.word_type == content::word::t_lt)
       {
-        TLOG_DEBUG(5) << "Received LLT word!";
+        TLOG_DEBUG(5) << "Received LLT word! TS: " + temp_word.timestamp;
         content::word::trigger_t * llt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word ) ;
+        curr_llt = {llt_word->timestamp, (llt_word->trigger_word & 0xFFFFFFFF)};
+        if (check_repeated_word(curr_llt, prev_llt, temp_word.word_type)) continue;
         match_buf_a_llts.push(*llt_word);
-        match_buf_b_llts.push({llt_word->timestamp, (llt_word->trigger_word & 0xFFFFFFFF)});
+        match_buf_b_llts.push(curr_llt);
 
         ++m_run_LLT_counter;
         for (auto &llt : m_llt_trigger_counter) { if( (llt_word->trigger_word >> llt.first) & 0x1 ) ++llt.second; }
-        m_last_readout_llt_timestamp = temp_word.timestamp;
+        prev_llt = curr_llt;
       }
       else if (temp_word.word_type == content::word::t_ch)
       {
 
-        TLOG_DEBUG(5) << "Received Channel Status word!";
         content::word::ch_status_t * ch_stat_word = reinterpret_cast<content::word::ch_status_t*>( & temp_word ) ;
+        // The channel status only has 60b TS so complete the upper 4b from the TS Word. (fyi 60b rolls over >500yr @ 62.5MHz) 
+        uint64_t corrected_ts = ((prev_timestamp & 0xF000000000000000) | ch_stat_word->timestamp);
+        TLOG_DEBUG(6) << "Received Channel Status word! TS: " + corrected_ts;
         ch_stat_beam = ch_stat_word->get_beam();
         ch_stat_crt  = ch_stat_word->get_crt();
         ch_stat_pds  = ch_stat_word->get_pds();
-        // The channel status only has 60b TS so complete the upper 4b from the TS Word. (fyi 60b rolls over >500yr @ 62.5MHz) 
-        match_buf_b_chstatus.push({
-            ((prev_timestamp & 0xF000000000000000) | ch_stat_word->timestamp), 
+        curr_ch_stat = {
+            corrected_ts, 
             ((ch_stat_pds << 48) | (ch_stat_crt << 16) | ch_stat_beam)
-        });
-
+        };
+        if (check_repeated_word(curr_ch_stat, prev_ch_stat, temp_word.word_type)) continue;
+        match_buf_b_chstatus.push(curr_ch_stat);
+        prev_ch_stat = curr_ch_stat;
 
         ++m_run_channel_status_counter;
       }
       // do matching
-      match_between_buffers(match_buf_a_hlts, match_buf_b_llts, m_last_readout_hlt_timestamp.load());
-      match_between_buffers(match_buf_a_llts, match_buf_b_chstatus, m_last_readout_llt_timestamp.load());
+      match_between_buffers(match_buf_a_hlts, match_buf_b_llts, prev_hlt.first);
+      match_between_buffers(match_buf_a_llts, match_buf_b_chstatus, prev_llt.first);
 
     } // n_words loop
 
@@ -391,6 +399,28 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
   
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Exiting do_work() method";
 
+}
+
+bool CTBModule::check_repeated_word(ts_payload& curr_word, ts_payload& prev_word, uint64_t wtype){
+  if (curr_word.first == prev_word.first) { // words with repeated timestamp. Not good!
+    std::stringstream msg;
+    msg << "Multiple words have the same timestamp, Using the first one. Word type: ";
+    if (wtype == content::word::word_type::t_gt) msg << "HLT";
+    else if (wtype == content::word::word_type::t_lt) msg << "LLT";
+    else if (wtype == content::word::word_type::t_ch) msg << "Channel Status";
+    else msg << wtype;
+    msg << ", TS: "<< curr_word.first << ".";
+    if (curr_word.second != prev_word.second) { // not only do we have repeated timestamp, they have different payload...
+      msg << " Different payload!! Previous payload: " << std::hex << prev_word.second
+          << " Current payload: " << curr_word.second;
+      ers::warning(CTBRepeatedTimestampWarning(ERS_HERE, msg.str()));
+    } else {
+      msg << "Both have payload " << std::hex << prev_word.second;
+      ers::info(CTBRepeatedTimestampWarning(ERS_HERE, msg.str()));
+    }
+    return true;
+  }
+  return false;
 }
 
 void CTBModule::send_matched_trigger_word(content::word::trigger_t& word, uint64_t payload) {

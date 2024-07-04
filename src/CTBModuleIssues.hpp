@@ -34,6 +34,11 @@ ERS_DECLARE_ISSUE(ctbmodules,
                   " CTB Word Matching Issue: " << descriptor, 
                   ((std::string)descriptor))
 
+ERS_DECLARE_ISSUE(ctbmodules, 
+                  CTBRepeatedTimestampWarning, 
+                  " CTB Repeated Word Issue: " << descriptor, 
+                  ((std::string)descriptor))
+
 ERS_DECLARE_ISSUE(ctbmodules,
                   CTBMessage,
                   " Mesage from CTB: " << descriptor,

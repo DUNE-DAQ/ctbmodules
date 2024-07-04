@@ -120,6 +120,8 @@ private:
   // Generate HSI Frame/Event
   void send_matched_trigger_word(content::word::trigger_t&, uint64_t);
   void match_between_buffers(std::queue<content::word::trigger_t>&, std::queue<ts_payload>&, uint64_t);
+
+  static bool check_repeated_word(ts_payload&, ts_payload&, uint64_t);
   
 
   template<typename T>
@@ -173,7 +175,6 @@ private:
   std::atomic<int> m_num_control_messages_sent;
   std::atomic<int> m_num_control_responses_received;
   std::atomic<uint64_t> m_last_readout_hlt_timestamp; // NOLINT(build/unsigned)
-  std::atomic<uint64_t> m_last_readout_llt_timestamp; // NOLINT(build/unsigned)
 
 };
 } // namespace ctbmodule
