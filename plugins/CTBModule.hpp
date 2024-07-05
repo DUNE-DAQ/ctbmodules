@@ -98,6 +98,8 @@ private:
   std::shared_ptr<dunedaq::hsilibs::HSIEventSender::raw_sender_ct> m_llt_hsi_data_sender;
   std::shared_ptr<dunedaq::hsilibs::HSIEventSender::raw_sender_ct> m_hlt_hsi_data_sender;
 
+  ts_payload last_popped_llt, last_popped_chstatus;
+
 
   // Commands
   void do_configure(const nlohmann::json& obj);
@@ -118,8 +120,8 @@ private:
   void do_hsi_work(std::atomic<bool>&);
 
   // Generate HSI Frame/Event
-  void send_matched_trigger_word(content::word::trigger_t&, uint64_t);
-  void match_between_buffers(std::queue<content::word::trigger_t>&, std::queue<ts_payload>&, uint64_t);
+  void send_matched_trigger_word(const content::word::trigger_t&, uint64_t);
+  void match_between_buffers(std::queue<content::word::trigger_t>&, std::queue<ts_payload>&, uint64_t, content::word::word_type);
 
   static bool check_repeated_word(ts_payload&, ts_payload&, uint64_t);
   

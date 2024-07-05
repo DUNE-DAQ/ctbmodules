@@ -357,8 +357,10 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
         ++m_run_channel_status_counter;
       }
       // do matching
-      match_between_buffers(match_buf_a_hlts, match_buf_b_llts, prev_hlt.first);
-      match_between_buffers(match_buf_a_llts, match_buf_b_chstatus, prev_llt.first);
+      match_between_buffers(match_buf_a_hlts, match_buf_b_llts, 
+          prev_hlt.first, content::word::word_type::t_gt);
+      match_between_buffers(match_buf_a_llts, match_buf_b_chstatus, 
+          prev_llt.first, content::word::word_type::t_lt);
 
     } // n_words loop
 
@@ -416,14 +418,14 @@ bool CTBModule::check_repeated_word(ts_payload& curr_word, ts_payload& prev_word
       ers::warning(CTBRepeatedTimestampWarning(ERS_HERE, msg.str()));
     } else {
       msg << " Both have payload 0x" << std::hex << prev_word.second;
-      ers::info(CTBRepeatedTimestampWarning(ERS_HERE, msg.str()));
+      TLOG() << msg.str();
     }
     return true;
   }
   return false;
 }
 
-void CTBModule::send_matched_trigger_word(content::word::trigger_t& word, uint64_t payload) {
+void CTBModule::send_matched_trigger_word(const content::word::trigger_t& word, uint64_t payload) {
   // Send HSI data to a DLH
   std::array<uint32_t, 7> hsi_struct;
   bool is_hlt = word.IsHLT();
@@ -462,10 +464,10 @@ void CTBModule::send_matched_trigger_word(content::word::trigger_t& word, uint64
   
 }
 
-void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_a, std::queue<ts_payload>& buf_b, uint64_t timeout_reference) {
+void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_a, std::queue<ts_payload>& buf_b, uint64_t timeout_reference, content::word::word_type buf_a_wtype) {
+  bool is_hlt = (buf_a_wtype == content::word::word_type::t_gt);
   while (buf_a.size() > 0) {
     content::word::trigger_t trigger = buf_a.front();
-    bool is_hlt = trigger.IsHLT();
     uint64_t trigger_ts = trigger.timestamp;
     uint64_t trigger_word = trigger.trigger_word;
     if (timeout_reference > (trigger_ts + 100)) {
@@ -481,11 +483,15 @@ void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_
     while (buf_b.size() > 0) {
       uint64_t input_ts = buf_b.front().first;
       if (input_ts < (trigger_ts - 1)) { // word is too early. No longer needed
+        if (is_hlt) last_popped_llt = buf_b.front();
+        else last_popped_chstatus = buf_b.front();
         buf_b.pop();
       }
       else if (input_ts == (trigger_ts - 1)) { // match is found
         send_matched_trigger_word(trigger, buf_b.front().second);
         buf_a.pop();
+        if (is_hlt) last_popped_llt = buf_b.front();
+        else last_popped_chstatus = buf_b.front();
         buf_b.pop();
         break;
       }
@@ -496,7 +502,9 @@ void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_
         else{
           std::stringstream msg;
           msg << "No match found for " << (is_hlt? "HLT" : "LLT")
-              << ": TS = " << trigger_ts << ", trigger word = 0x" << std::hex << trigger_word;
+              << ": TS = " << trigger_ts << ", trigger word = 0x" << std::hex << trigger_word
+              << " Adjacent input ts: " << std::dec << (is_hlt? last_popped_llt.first : last_popped_chstatus.first) << " "
+              << input_ts;
           ers::warning(CTBWordMatchWarning(ERS_HERE, msg.str()));
         }
         buf_a.pop();
@@ -505,7 +513,11 @@ void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_
     } // end loop buf_b
   } // end loop buf_a
   // Don't let buf_b get too long (e.g. when LLT rate is high but HLT rate is low)
-  while (buf_b.size() > 32) buf_b.pop();
+  while (buf_b.size() > 32) {
+    if (is_hlt) last_popped_llt = buf_b.front();
+    else last_popped_chstatus = buf_b.front();
+    buf_b.pop();
+  }
 }
 
 
