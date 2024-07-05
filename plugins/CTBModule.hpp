@@ -36,8 +36,11 @@
 #include <boost/asio.hpp>
 #include <boost/array.hpp>
 
+
 namespace dunedaq {
 namespace ctbmodules {
+
+typedef std::pair<uint64_t,uint64_t> ts_payload;
 
 /**
  * @brief CTBModule provides the command and readout interface to the Central Trigger Board hardware
@@ -59,7 +62,6 @@ public:
 
   void init(const nlohmann::json& iniobj) override;
 
-  static uint64_t MatchTriggerInput(const content::word::trigger_t * trigger, const std::pair<uint64_t,uint64_t> &prev_input, const std::pair<uint64_t,uint64_t> &prev_prev_input, bool hlt_matching) noexcept;
   static bool IsTSWord( const content::word::word_t &w ) noexcept;
   static bool IsFeedbackWord( const content::word::word_t &w ) noexcept;
   bool ErrorState() const { return m_error_state.load() ; } 
@@ -96,6 +98,8 @@ private:
   std::shared_ptr<dunedaq::hsilibs::HSIEventSender::raw_sender_ct> m_llt_hsi_data_sender;
   std::shared_ptr<dunedaq::hsilibs::HSIEventSender::raw_sender_ct> m_hlt_hsi_data_sender;
 
+  ts_payload last_popped_llt, last_popped_chstatus;
+
 
   // Commands
   void do_configure(const nlohmann::json& obj);
@@ -114,6 +118,13 @@ private:
   // Threading
   dunedaq::utilities::WorkerThread m_thread_;
   void do_hsi_work(std::atomic<bool>&);
+
+  // Generate HSI Frame/Event
+  void send_matched_trigger_word(const content::word::trigger_t&, uint64_t);
+  void match_between_buffers(std::queue<content::word::trigger_t>&, std::queue<ts_payload>&, uint64_t, content::word::word_type);
+
+  static bool check_repeated_word(ts_payload&, ts_payload&, uint64_t);
+  
 
   template<typename T>
   bool read(T &obj);
