@@ -411,11 +411,11 @@ bool CTBModule::check_repeated_word(ts_payload& curr_word, ts_payload& prev_word
     else msg << wtype;
     msg << ", TS: "<< curr_word.first << ".";
     if (curr_word.second != prev_word.second) { // not only do we have repeated timestamp, they have different payload...
-      msg << " Different payload!! Previous payload: " << std::hex << prev_word.second
-          << " Current payload: " << curr_word.second;
+      msg << " Different payload!! Previous payload: 0x" << std::hex << prev_word.second
+          << " Current payload: 0x" << curr_word.second;
       ers::warning(CTBRepeatedTimestampWarning(ERS_HERE, msg.str()));
     } else {
-      msg << "Both have payload " << std::hex << prev_word.second;
+      msg << " Both have payload 0x" << std::hex << prev_word.second;
       ers::info(CTBRepeatedTimestampWarning(ERS_HERE, msg.str()));
     }
     return true;
@@ -471,8 +471,8 @@ void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_
     if (timeout_reference > (trigger_ts + 100)) {
       std::stringstream msg;
       msg << "Time out while waiting for a match for the "<< (is_hlt? "HLT" : "LLT")
-          << ": TS = " << trigger_ts << ", trigger word = " << trigger_word
-          << " Timeout reference: " << timeout_reference;
+          << ": TS = " << trigger_ts << ", trigger word = " << std::hex << "0x"<< trigger_word
+          << " Timeout reference: " << std::dec << timeout_reference;
       ers::warning(CTBWordMatchWarning(ERS_HERE, msg.str()));
       buf_a.pop();
       continue;
@@ -496,7 +496,7 @@ void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_
         else{
           std::stringstream msg;
           msg << "No match found for " << (is_hlt? "HLT" : "LLT")
-              << ": TS = " << trigger_ts << ", trigger word = " << trigger_word;
+              << ": TS = " << trigger_ts << ", trigger word = 0x" << std::hex << trigger_word;
           ers::warning(CTBWordMatchWarning(ERS_HERE, msg.str()));
         }
         buf_a.pop();
