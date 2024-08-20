@@ -42,6 +42,20 @@ def update_triggers(updated_triggers, default_trigger_conf):
 
     return default_trigger_conf
 
+def update_array(updated_conf, default_conf):
+    """
+    Update an array in the default schema, if needed
+    :param (List) updated_conf: Array of values to update
+    :param (List) default_conf: Array from schema that needs to be updated.
+    :return: (List) default or updated array
+    """
+    if updated_conf is not None and len(updated_conf) != 0:
+        assert len(updated_conf) == len(default_conf), \
+        ("CTBModule: Configured array is being overwritten by array of different length: "
+        f"Default array has length {len(default_conf)}, incoming has length {len(updated_conf)}")
+        default_conf = updated_conf
+    return default_conf
+
 
 def get_ctb_hsi_app(
         ctb_hsi,
@@ -64,6 +78,12 @@ def get_ctb_hsi_app(
     PDS_LLT_LIST=ctb_hsi.pds_llt_triggers
     FAKE_TRIG_1=ctb_hsi.fake_trig_1
     FAKE_TRIG_2=ctb_hsi.fake_trig_2
+    BEAM_RESHAPES = ctb_hsi.beam_reshape_lengths
+    CRT_RESHAPES = ctb_hsi.crt_reshape_lengths
+    PDS_RESHAPES = ctb_hsi.pds_reshape_lengths
+    BEAM_DELAYS = ctb_hsi.beam_delays
+    CRT_DELAYS = ctb_hsi.crt_delays
+    PDS_DELAYS = ctb_hsi.pds_delays
 
     console = Console()
 
@@ -75,17 +95,17 @@ def get_ctb_hsi_app(
     console.log('generating DAQ module')
 
     # Get default LLT and HLTs
-    hlt_trig = ctb.Hlt().pod()
-    beam_trig = ctb.Beam().pod()
-    crt_trig = ctb.Crt().pod()
-    pds_trig = ctb.Pds().pod()
+    hlt_conf = ctb.Hlt().pod()
+    beam_conf = ctb.Beam().pod()
+    crt_conf = ctb.Crt().pod()
+    pds_conf = ctb.Pds().pod()
     fake_triggers = ctb.Misc().pod()
 
     # Update LLT, HLTs with new or redefined triggers
-    updated_hlt_triggers = update_triggers(updated_triggers=HLT_LIST, default_trigger_conf=hlt_trig["trigger"])
-    updated_beam_triggers = update_triggers(updated_triggers=BEAM_LLT_LIST, default_trigger_conf=beam_trig["triggers"])
-    updated_crt_triggers = update_triggers(updated_triggers=CRT_LLT_LIST, default_trigger_conf=crt_trig["triggers"])
-    updated_pds_triggers = update_triggers(updated_triggers=PDS_LLT_LIST, default_trigger_conf=pds_trig["triggers"])
+    updated_hlt_triggers = update_triggers(updated_triggers=HLT_LIST, default_trigger_conf=hlt_conf["trigger"])
+    updated_beam_triggers = update_triggers(updated_triggers=BEAM_LLT_LIST, default_trigger_conf=beam_conf["triggers"])
+    updated_crt_triggers = update_triggers(updated_triggers=CRT_LLT_LIST, default_trigger_conf=crt_conf["triggers"])
+    updated_pds_triggers = update_triggers(updated_triggers=PDS_LLT_LIST, default_trigger_conf=pds_conf["triggers"])
 
     # Accept top config level fake trigger definition
     fake_trig_1 = fake_triggers["randomtrigger_1"]
@@ -95,14 +115,30 @@ def get_ctb_hsi_app(
     if FAKE_TRIG_2 is not None:
         fake_trig_2 = FAKE_TRIG_2
 
-
+    # Accept top config level reshape and delay definitions
+    updated_beam_reshapes = update_array(BEAM_RESHAPES, beam_conf["reshape_lengths"])
+    updated_crt_reshapes = update_array(CRT_RESHAPES, crt_conf["reshape_lengths"])
+    updated_pds_reshapes = update_array(PDS_RESHAPES, pds_conf["reshape_lengths"])
+    updated_beam_delays = update_array(BEAM_DELAYS, beam_conf["delays"])
+    updated_crt_delays = update_array(CRT_DELAYS, crt_conf["delays"])
+    updated_pds_delays = update_array(PDS_DELAYS, pds_conf["delays"])
+    
+    updated_pds_conf = ctb.Pds(triggers=updated_pds_triggers, 
+                               reshape_lengths=updated_pds_reshapes,
+                               delays=updated_pds_delays)
+    updated_crt_conf = ctb.Crt(triggers=updated_crt_triggers, 
+                               reshape_lengths=updated_crt_reshapes,
+                               delays=updated_crt_delays)
+    updated_beam_conf = ctb.Beam(triggers=updated_beam_triggers, 
+                               reshape_lengths=updated_beam_reshapes,
+                               delays=updated_beam_delays)
     modules += [DAQModule(name = nickname, 
                           plugin = 'CTBModule',
                           conf = ctb.Conf(board_config=ctb.Board_config(ctb=ctb.Ctb(misc=ctb.Misc(randomtrigger_1=fake_trig_1, randomtrigger_2=fake_trig_2),
                                 HLT=ctb.Hlt(trigger=updated_hlt_triggers),
-                                subsystems=ctb.Subsystems(pds=ctb.Pds(triggers=updated_pds_triggers),
-                                                          crt=ctb.Crt(triggers=updated_crt_triggers),
-                                                          beam=ctb.Beam(triggers=updated_beam_triggers)),
+                                subsystems=ctb.Subsystems(pds=updated_pds_conf,
+                                                          crt=updated_crt_conf,
+                                                          beam=updated_beam_conf),
                                 sockets=ctb.Sockets(receiver=ctb.Receiver(host=HOST)) 
                                 )))
                              )]
