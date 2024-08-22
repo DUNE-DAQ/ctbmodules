@@ -116,21 +116,21 @@ def get_ctb_hsi_app(
         fake_trig_2 = FAKE_TRIG_2
 
     # Accept top config level reshape and delay definitions
-    updated_beam_reshapes = update_array(BEAM_RESHAPES, beam_conf["reshape_lengths"])
-    updated_crt_reshapes = update_array(CRT_RESHAPES, crt_conf["reshape_lengths"])
-    updated_pds_reshapes = update_array(PDS_RESHAPES, pds_conf["reshape_lengths"])
+    updated_beam_reshapes = update_array(BEAM_RESHAPES, beam_conf["reshape_length"])
+    updated_crt_reshapes = update_array(CRT_RESHAPES, crt_conf["reshape_length"])
+    updated_pds_reshapes = update_array(PDS_RESHAPES, pds_conf["reshape_length"])
     updated_beam_delays = update_array(BEAM_DELAYS, beam_conf["delays"])
     updated_crt_delays = update_array(CRT_DELAYS, crt_conf["delays"])
     updated_pds_delays = update_array(PDS_DELAYS, pds_conf["delays"])
     
     updated_pds_conf = ctb.Pds(triggers=updated_pds_triggers, 
-                               reshape_lengths=updated_pds_reshapes,
+                               reshape_length=updated_pds_reshapes,
                                delays=updated_pds_delays)
     updated_crt_conf = ctb.Crt(triggers=updated_crt_triggers, 
-                               reshape_lengths=updated_crt_reshapes,
+                               reshape_length=updated_crt_reshapes,
                                delays=updated_crt_delays)
     updated_beam_conf = ctb.Beam(triggers=updated_beam_triggers, 
-                               reshape_lengths=updated_beam_reshapes,
+                               reshape_length=updated_beam_reshapes,
                                delays=updated_beam_delays)
     modules += [DAQModule(name = nickname, 
                           plugin = 'CTBModule',
