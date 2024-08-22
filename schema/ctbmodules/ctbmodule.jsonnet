@@ -144,7 +144,7 @@ local ctbmodule = {
 
     pds: s.record("Pds",  [
         s.field("channel_mask", self.string, "0xFFFFFF"),
-        s.field("reshape_lengths", self.array, [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5]),
+        s.field("reshape_length", self.uint8, 5),
         s.field("delays", self.array, [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]),
         s.field("dac_thresholds", self.array, [2185,2194,2170,2176,2167,2200,2179,2197,2188,2179,2185,2191,2176,2182,2191,2182,2176,2173,2200,2185,2182,2176,2191,2167]),
         s.field("triggers", self.llt_count_trigger_seq, [
@@ -159,7 +159,7 @@ local ctbmodule = {
     crt: s.record("Crt",  [
         s.field("channel_mask", self.string, "0xFFFFFFFF"),
         s.field("pixelate", self.boolean, true),
-        s.field("reshape_lengths", self.array, [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5]),
+        s.field("reshape_length", self.uint8, 5),
         s.field("delays", self.array, [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]),
         s.field("triggers", self.llt_count_trigger_seq, [
             {"id":"LLT_11", "description":"Select CRT pixels around beam pipe (upstream)", "enable":false, "mask":"0xF000", "type":"0x1", "count":"0x0"},
@@ -176,7 +176,7 @@ local ctbmodule = {
 
     beam: s.record("Beam",  [
         s.field("channel_mask", self.string, "0x1FB"),
-        s.field("reshape_lengths", self.array, [50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50]),
+        s.field("reshape_length", self.uint8, 15),
         s.field("delays", self.array, [1,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0]),
         s.field("triggers", self.llt_mask_trigger_seq, [
             {"id":"LLT_1", "description":"Beam trigger", "enable":false, "mask":"0x1E3"},
