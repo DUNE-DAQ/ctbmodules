@@ -176,7 +176,7 @@ local ctbmodule = {
 
     beam: s.record("Beam",  [
         s.field("channel_mask", self.string, "0x1FB"),
-        s.field("reshape_length", self.uint8, 50),
+        s.field("reshape_length", self.uint8, 15),
         s.field("delays", self.array, [1,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0]),
         s.field("triggers", self.llt_mask_trigger_seq, [
             {"id":"LLT_1", "description":"Beam trigger", "enable":false, "mask":"0x1E3"},
