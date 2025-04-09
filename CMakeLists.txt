@@ -12,10 +12,6 @@ find_package(logging REQUIRED)
 find_package(ers REQUIRED)
 find_package(hsilibs REQUIRED)
 
-daq_codegen(ctbmodule.jsonnet TEMPLATES Structs.hpp.j2 Nljs.hpp.j2 )
-daq_codegen(ctbmoduleinfo.jsonnet DEP_PKGS opmonlib TEMPLATES opmonlib/InfoStructs.hpp.j2 opmonlib/InfoNljs.hpp.j2 )
-
-
 daq_add_plugin(CTBModule duneDAQModule            LINK_LIBRARIES hsilibs::hsilibs appfwk::appfwk)
 
 daq_install()
