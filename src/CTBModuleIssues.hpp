@@ -39,6 +39,10 @@ ERS_DECLARE_ISSUE(ctbmodules,
                   " Mesage from CTB: " << descriptor,
                   ((std::string)descriptor))
 
+ERS_DECLARE_ISSUE(ctbmodules,
+                  CTBConfigFailure,
+		  descriptor,
+                  ((std::string)descriptor))
 
 
 

@@ -13,6 +13,7 @@
 #define CTBMODULE_PLUGINS_CTBModule_HPP_
 
 #include "appfwk/DAQModule.hpp"
+#include "appmodel/CTBModule.hpp"
 #include "iomanager/Receiver.hpp"
 #include "iomanager/Sender.hpp"
 #include "utilities/WorkerThread.hpp"
@@ -22,9 +23,6 @@
 #include <ers/Issue.hpp>
 
 #include "CTBPacketContent.hpp"
-
-#include "ctbmodules/ctbmodule/Nljs.hpp"
-#include "ctbmodules/ctbmoduleinfo/InfoNljs.hpp"
 
 #include <memory>
 #include <string>
@@ -56,14 +54,15 @@ public:
   CTBModule(CTBModule&&) = delete;                 ///< CTBModule is not move-constructible
   CTBModule& operator=(CTBModule&&) = delete;      ///< CTBModule is not move-assignable
 
-  void init(const nlohmann::json& iniobj) override;
+  void init(std::shared_ptr<appfwk::ConfigurationManager> cfgMgr) override;
 
   static uint64_t MatchTriggerInput(const uint64_t trigger_ts, const std::pair<uint64_t,uint64_t> &prev_input, const std::pair<uint64_t,uint64_t> &prev_prev_input, bool hlt_matching) noexcept;
   static bool IsTSWord( const content::word::word_t &w ) noexcept;
   static bool IsFeedbackWord( const content::word::word_t &w ) noexcept;
   bool ErrorState() const { return m_error_state.load() ; } 
 
-  void get_info(opmonlib::InfoCollector& ci, int level) override;
+protected:
+  void generate_opmon_data() override;
   
 private:
 
@@ -98,7 +97,10 @@ private:
   bool send_message(const std::string & msg);
 
   // Configuration
-  dunedaq::ctbmodules::ctbmodule::Conf m_cfg;
+  std::shared_ptr<appfwk::ConfigurationManager> m_cfg;
+  using conf_t = appmodel::CTBModule;
+  const conf_t* m_module = nullptr;
+
   std::atomic<daqdataformats::run_number_t> m_run_number;
 
   // Threading

@@ -10,10 +10,8 @@
 #include "CTBModule.hpp"
 #include "CTBModuleIssues.hpp"
 
-#include "appfwk/DAQModuleHelper.hpp"
 #include "iomanager/IOManager.hpp"
 #include "logging/Logging.hpp"
-#include "rcif/cmd/Nljs.hpp"
 
 #include <chrono>
 #include <string>
@@ -65,10 +63,22 @@ CTBModule::~CTBModule(){
 }
 
 void
-CTBModule::init(const nlohmann::json& init_data)
+CTBModule::init(std::shared_ptr<appfwk::ConfigurationManager> cfgMgr)
 {
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering init() method";
-  HSIEventSender::init(init_data);
+
+  HSIEventSender::init(cfgMgr);
+
+  m_cfg = cfgMgr;
+  
+  auto mdal = cfgMgr->get_dal<appmodel::CTBModule>(get_name()); 
+
+  if (! mdal) {
+    throw ctbmodules::CTBConfigFailure(ERS_HERE, "Missing Module configuration for " + get_name());
+  }
+
+  m_module = mdal;
+  
   m_llt_hsi_data_sender = get_iom_sender<dunedaq::hsilibs::HSI_FRAME_STRUCT>(appfwk::connection_uid(init_data, "llt_output"));
   m_hlt_hsi_data_sender = get_iom_sender<dunedaq::hsilibs::HSI_FRAME_STRUCT>(appfwk::connection_uid(init_data, "hlt_output"));
 
