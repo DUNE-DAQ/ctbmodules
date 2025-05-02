@@ -29,12 +29,16 @@
 #include <vector>
 #include <fstream>
 #include <shared_mutex>
+#include <map>
 
 #include <boost/asio.hpp>
 #include <boost/array.hpp>
 
+
 namespace dunedaq {
 namespace ctbmodules {
+
+typedef std::pair<uint64_t,uint64_t> ts_payload;
 
 /**
  * @brief CTBModule provides the command and readout interface to the Central Trigger Board hardware
@@ -56,7 +60,6 @@ public:
 
   void init(std::shared_ptr<appfwk::ConfigurationManager> cfgMgr) override;
 
-  static uint64_t MatchTriggerInput(const uint64_t trigger_ts, const std::pair<uint64_t,uint64_t> &prev_input, const std::pair<uint64_t,uint64_t> &prev_prev_input, bool hlt_matching) noexcept;
   static bool IsTSWord( const content::word::word_t &w ) noexcept;
   static bool IsFeedbackWord( const content::word::word_t &w ) noexcept;
   bool ErrorState() const { return m_error_state.load() ; } 
@@ -66,15 +69,24 @@ protected:
   
 private:
 
-  // control variables
+  // control and monitoring variables
 
   std::atomic<bool> m_is_running;
+  std::atomic<bool> m_stop_requested;
   std::atomic<bool> m_is_configured;
 
   /*const */unsigned int m_receiver_port;
   std::chrono::microseconds m_timeout;
   std::atomic<unsigned int> m_n_TS_words;
   std::atomic<bool> m_error_state;
+
+  std::atomic<unsigned int> m_total_hlt_counter;
+  std::atomic<unsigned int> m_ts_word_counter;
+
+  size_t m_hlt_range = 20;
+  size_t m_llt_range = 25;
+  std::map<size_t, std::atomic<unsigned int>> m_hlt_trigger_counter;
+  std::map<size_t, std::atomic<unsigned int>> m_llt_trigger_counter;
 
   boost::asio::io_service m_control_ios;
   boost::asio::io_service m_receiver_ios;
@@ -84,6 +96,8 @@ private:
 
   std::shared_ptr<dunedaq::hsilibs::HSIEventSender::raw_sender_ct> m_llt_hsi_data_sender;
   std::shared_ptr<dunedaq::hsilibs::HSIEventSender::raw_sender_ct> m_hlt_hsi_data_sender;
+
+  ts_payload last_popped_llt, last_popped_chstatus;
 
 
   // Commands
@@ -107,6 +121,13 @@ private:
   dunedaq::utilities::WorkerThread m_thread_;
   void do_hsi_work(std::atomic<bool>&);
 
+  // Generate HSI Frame/Event
+  void send_matched_trigger_word(const content::word::trigger_t&, uint64_t);
+  void match_between_buffers(std::queue<content::word::trigger_t>&, std::queue<ts_payload>&, uint64_t, content::word::word_type);
+
+  static bool check_repeated_word(ts_payload&, ts_payload&, uint64_t);
+  
+
   template<typename T>
   bool read(T &obj);
 
@@ -123,33 +144,12 @@ private:
   std::ofstream m_calibration_file;
   std::chrono::steady_clock::time_point m_last_calibration_file_update;
 
-  // members related to run trigger report
-
-  bool m_has_run_trigger_report = false;
-  std::string m_run_trigger_dir = "";
-  bool store_run_trigger_counters( unsigned int run_number, const std::string & prefix = "" ) const;
-
-
-  std::atomic<unsigned long> m_run_gool_part_counter = 0;
+  // metric utilities
   std::atomic<unsigned long> m_run_HLT_counter = 0;
-  // TODO should be atomic?
-  unsigned long m_run_HLT_counters[8] = {0};
   std::atomic<unsigned long> m_run_LLT_counter;
   std::atomic<unsigned long> m_run_channel_status_counter = 0;
-  // metric utilities
-
-  const std::array<std::string, 8> m_metric_HLT_names  = { "CTB_HLT_0_rate",
-                                                            "CTB_HLT_1_rate", 
-                                                            "CTB_HLT_2_rate",
-                                                            "CTB_HLT_3_rate",
-                                                            "CTB_HLT_4_rate",
-                                                            "CTB_HLT_5_rate",
-                                                            "CTB_HLT_6_rate",
-                                                            "CTB_HLT_7_rate" };
-
 
   // monitoring
-
   std::deque<uint> m_buffer_counts; // NOLINT(build/unsigned)
   std::shared_mutex m_buffer_counts_mutex;
   void update_buffer_counts(uint new_count); // NOLINT(build/unsigned)
