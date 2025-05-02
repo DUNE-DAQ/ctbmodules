@@ -9,7 +9,7 @@
 
 #include "appmodel/CTBConf.hpp"
 #include "appmodel/CTBCalibrationStream.hpp"
-#include "appmodel/CTBTriggerReport.hpp"
+
 
 #include "CTBModule.hpp"
 #include "CTBModuleIssues.hpp"
@@ -135,8 +135,7 @@ CTBModule::do_configure(const data_t& args)
   for(size_t i = 0; i < m_hlt_range; i++) id_to_idx["HLT_" + std::to_string(i)] = i;
   for(size_t i = 0; i < m_llt_range; i++) id_to_idx["LLT_" + std::to_string(i)] = i;
 
-  nlohmann::json random_triggers = m_cfg.board_config.ctb.misc;
-
+  
   // HLTs
   // 0th HLT is random trigger that's not in HLT array
   if (random_triggers["randomtrigger_1"]["enable"]) m_hlt_trigger_counter[0] = 0;
