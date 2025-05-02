@@ -7,6 +7,10 @@
  * received with this code.
  */
 
+#include "appmodel/CTBConf.hpp"
+#include "appmodel/CTBCalibrationStream.hpp"
+#include "appmodel/CTBTriggerReport.hpp"
+
 #include "CTBModule.hpp"
 #include "CTBModuleIssues.hpp"
 
@@ -78,10 +82,24 @@ CTBModule::init(std::shared_ptr<appfwk::ConfigurationManager> cfgMgr)
   }
 
   m_module = mdal;
-  
-  m_llt_hsi_data_sender = get_iom_sender<dunedaq::hsilibs::HSI_FRAME_STRUCT>(appfwk::connection_uid(init_data, "llt_output"));
-  m_hlt_hsi_data_sender = get_iom_sender<dunedaq::hsilibs::HSI_FRAME_STRUCT>(appfwk::connection_uid(init_data, "hlt_output"));
 
+  // setting up connections
+  auto iom = iomanager::IOManager::get();
+
+  using hsi_frame_t = dunedaq::hsilibs::HSI_FRAME_STRUCT;
+  for ( auto con : m_module->get_outputs() ) {
+    if ( con->get_data_type() == datatype_to_string<hsi_frame_t>() ) {
+      if ( con->UID().find("HLT")!=std::string::npos
+	   || con->UID().find("hlt")!=std::string::npos ) {
+	m_hlt_hsi_data_sender = iom->get_sender<hsi_frame_t>(con->UID());
+      }
+      if ( con->UID().find("LLT")!=std::string::npos
+	   || con->UID().find("llt")!=std::string::npos ) {
+	m_llt_hsi_data_sender = iom->get_sender<hsi_frame_t>(con->UID());
+      } 
+    } // if data type is HSI Frame
+  } // loop over outputs
+    
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Exiting init() method";
 }
 
@@ -91,11 +109,14 @@ CTBModule::do_configure(const data_t& args)
 
   TLOG_DEBUG(0) << get_name() << ": Configuring CTB";
 
-  m_cfg = args.get<ctbmodule::Conf>();
-  m_receiver_port = m_cfg.board_config.ctb.sockets.receiver.port;  
-  m_timeout = std::chrono::microseconds( m_cfg.receiver_connection_timeout ) ;
+  auto conf = m_module ->get_configuration();
 
-  TLOG_DEBUG(0) << get_name() << ": Board receiver network location " << m_cfg.board_config.ctb.sockets.receiver.host << ':' << m_cfg.board_config.ctb.sockets.receiver.port << std::endl;
+  m_receiver_port = conf->get_control_connection_port();
+  m_timeout = std::chrono::milliseconds( conf->get_connection_timeout_ms() ) ;
+
+  auto hostname = conf->get_hostname();
+  TLOG() << get_name() << ": Board receiver network location "
+	 << hostname << ':' << m_receiver_port << std::endl;
 
   // Initialise monitoring variables
   m_num_control_messages_sent = 0;
@@ -103,7 +124,8 @@ CTBModule::do_configure(const data_t& args)
 
   // network connection to ctb hardware control
   boost::asio::ip::tcp::resolver resolver( m_control_ios ); 
-  boost::asio::ip::tcp::resolver::query query(m_cfg.ctb_hostname, std::to_string(m_cfg.control_connection_port) ) ; //"np04-ctb-1", 8991
+  boost::asio::ip::tcp::resolver::query query( hostname,
+					       std::to_string(m_receiver_port) ) ; //"np04-ctb-1", 8991
   boost::asio::ip::tcp::resolver::iterator iter = resolver.resolve(query) ;
 
   m_endpoint = iter->endpoint(); 
@@ -112,24 +134,28 @@ CTBModule::do_configure(const data_t& args)
   m_control_socket.connect( m_endpoint );
 
   // if necessary, set the calibration stream
-  if ( m_cfg.calibration_stream_output != "")  {
+  auto stream_conf = conf->get_calibration_stream();
+  if ( stream_conf ) {
     m_has_calibration_stream = true ; 
-    m_calibration_dir = m_cfg.calibration_stream_output ;
-    m_calibration_file_interval = std::chrono::minutes(m_cfg.calibration_update); 
+    m_calibration_dir = stream_conf->get_directory();
+    m_calibration_file_interval = std::chrono::seconds(stream_conf->get_update_period_s()));
+						       ; 
   }
 
-  if ( m_cfg.run_trigger_output != "" ) {
+  auto trigger_report_conf = conf->get_trigger_report();
+  if ( trigger_report_conf ) {
     m_has_run_trigger_report = true ; 
-    m_run_trigger_dir = m_cfg.run_trigger_output;
+    m_run_trigger_dir = trigger_report_conf->get_directory();
     if ( m_run_trigger_dir.back() != '/' ) m_run_trigger_dir += '/' ;
   }
 
   // create the json string
-  nlohmann::json config;
-  to_json(config, m_cfg.board_config);
-  //TLOG() << "CONF TEST: " << config.dump();
+  auto json_conf = m_module->get_board()->get_ctb_json(* m_cfg->session() );
+  auto json_dump = json_conf.dump();
 
-  send_config(config.dump());
+  TLOG() << "Sending configuration: " << json_dump;
+
+  send_config(json_dump);
 }
 
 void
