@@ -9,7 +9,12 @@
 
 #include "appmodel/CTBConf.hpp"
 #include "appmodel/CTBCalibrationStream.hpp"
-
+#include "appmodel/CTBoardConf.hpp"
+#include "appmodel/CTBMisc.hpp"
+#include "appmodel/CTBRandomTrigger.hpp"
+#include "appmodel/CTBHLT.hpp"
+#include "appmodel/CTBLLT.hpp"
+#include "appmodel/CTBCountLLT.hpp"
 
 #include "CTBModule.hpp"
 #include "CTBModuleIssues.hpp"
@@ -112,7 +117,7 @@ CTBModule::init(std::shared_ptr<appfwk::ConfigurationManager> cfgMgr)
 }
 
 void
-CTBModule::do_configure(const data_t& args)
+CTBModule::do_configure(const data_t&)
 {
 
   TLOG_DEBUG(0) << get_name() << ": Configuring CTB";
@@ -135,21 +140,25 @@ CTBModule::do_configure(const data_t& args)
   for(size_t i = 0; i < m_hlt_range; i++) id_to_idx["HLT_" + std::to_string(i)] = i;
   for(size_t i = 0; i < m_llt_range; i++) id_to_idx["LLT_" + std::to_string(i)] = i;
 
-  
+  auto board = m_module->get_board();
+  auto misc = board->get_misc();
+  auto session = m_cfg->session();
   // HLTs
   // 0th HLT is random trigger that's not in HLT array
-  if (random_triggers["randomtrigger_1"]["enable"]) m_hlt_trigger_counter[0] = 0;
-  nlohmann::json trigger_array = m_cfg.board_config.ctb.HLT.trigger;
-  for (const auto& trigger : trigger_array) { if (trigger["enable"]) m_hlt_trigger_counter[id_to_idx[trigger["id"]]] = 0; }
+  if (! misc->get_randomtrigger_1()->disabled( *session ) ) m_hlt_trigger_counter[0] = 0;
+
+  auto hlts = board->get_HLTs();
+  for (const auto& hlt : hlts) { if (! hlt->disabled(*session) ) m_hlt_trigger_counter[id_to_idx[hlt->UID()]] = 0; }
 
   // LLTs: Beam and CRT
   // 0th LLT is random trigger that's not in HLT array
-  if (random_triggers["randomtrigger_2"]["enable"]) m_llt_trigger_counter[0] = 0;
-  trigger_array = m_cfg.board_config.ctb.subsystems.crt.triggers;
-  for (const auto& trigger : trigger_array) { if (trigger["enable"]) m_llt_trigger_counter[id_to_idx[trigger["id"]]] = 0; }
+  if (! misc->get_randomtrigger_2()->disabled( *session ) ) m_llt_trigger_counter[0] = 0;
 
-  trigger_array = m_cfg.board_config.ctb.subsystems.beam.triggers;
-  for (const auto& trigger : trigger_array) { if (trigger["enable"]) m_llt_trigger_counter[id_to_idx[trigger["id"]]] = 0; }
+  auto beam_llts = board->get_beam_LLTs();
+  for (const auto& llt : beam_llts) { if (! llt->disabled(*session)) m_llt_trigger_counter[id_to_idx[llt->UID()]] = 0; }
+
+  auto crt_llts = board->get_crt_LLTs();
+  for (const auto& llt : crt_llts) { if (! llt->disabled(*session)) m_llt_trigger_counter[id_to_idx[llt->UID()]] = 0; }
 
   // network connection to ctb hardware control
   boost::asio::ip::tcp::resolver resolver( m_control_ios ); 
@@ -167,12 +176,12 @@ CTBModule::do_configure(const data_t& args)
   if ( stream_conf ) {
     m_has_calibration_stream = true ; 
     m_calibration_dir = stream_conf->get_directory();
-    m_calibration_file_interval = std::chrono::seconds(stream_conf->get_update_period_s()));
+    m_calibration_file_interval = std::chrono::duration_cast<decltype(m_calibration_file_interval)>(std::chrono::seconds(stream_conf->get_update_period_s()));
 						       ; 
   }
 
   // create the json string
-  auto json_conf = m_module->get_board()->get_ctb_json(* m_cfg->session() );
+  auto json_conf = m_module->get_board()->get_ctb_json(*session);
   auto json_dump = json_conf.dump();
 
   TLOG() << "Sending configuration: " << json_dump;
