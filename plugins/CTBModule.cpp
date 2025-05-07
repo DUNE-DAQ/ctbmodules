@@ -22,6 +22,8 @@
 #include "iomanager/IOManager.hpp"
 #include "logging/Logging.hpp"
 
+#include "ctbmodules/opmon/CTBModule.pb.h"
+
 #include <chrono>
 #include <string>
 #include <thread>
@@ -766,38 +768,35 @@ CTBModule::read_average_buffer_counts()
 
 void CTBModule::generate_opmon_data() 
 {
-  dunedaq::ctbmodules::ctbmoduleinfo::CTBModuleInfo module_info;
+  dunedaq::ctbmodules::opmon::CTBModuleInfo module_info;
 
-  module_info.num_control_messages_sent = m_num_control_messages_sent.load();
-  module_info.num_control_responses_received = m_num_control_responses_received.load();
-  module_info.ctb_hardware_run_status = m_is_running; 
-  module_info.ctb_hardware_configuration_status = m_is_configured;
+  module_info.set_num_control_messages_sent(m_num_control_messages_sent.load());
+  module_info.set_num_control_responses_received(m_num_control_responses_received.load());
+  module_info.set_ctb_hardware_running(m_is_running.load()); 
+  module_info.set_ctb_hardware_configured(m_is_configured.load());
     
-  module_info.last_readout_timestamp = m_last_readout_hlt_timestamp.load();
-  module_info.failed_to_send_hsi_events_counter = m_failed_to_send_counter.load();
-  module_info.last_sent_timestamp = m_last_sent_timestamp.load();
-  module_info.average_buffer_occupancy = read_average_buffer_counts();
+  module_info.set_last_readout_timestamp(m_last_readout_hlt_timestamp.load());
+  module_info.set_failed_to_send_hsi_events_counter( m_failed_to_send_counter.load() );
+  module_info.set_last_sent_timestamp(m_last_sent_timestamp.load());
+  module_info.set_average_buffer_occupancy( read_average_buffer_counts() );
 
-  module_info.total_hlt_count = m_total_hlt_counter.load();
-  module_info.ts_word_count = m_ts_word_counter.exchange(0);
+  module_info.set_total_hlt_count(m_total_hlt_counter.load() );
+  module_info.set_ts_word_count(m_ts_word_counter.exchange(0));
+
+  publish( std::move(module_info) );
 
   for (auto &hlt : m_hlt_trigger_counter) {
-    opmonlib::InfoCollector tmp_ic;
-    dunedaq::ctbmodules::ctbmoduleinfo::LevelTriggerInfo ti;
-    ti.count = hlt.second.exchange(0);
-    tmp_ic.add(ti);
-    ci.add("hlt_" + std::to_string(hlt.first), tmp_ic);
+    dunedaq::ctbmodules::opmon::TriggerInfo ti;
+    ti.set_count(hlt.second.exchange(0));
+    publish( std::move(ti), {{ "trigger", "hlt_" + std::to_string(hlt.first)}} );
   }
 
   for (auto &llt : m_llt_trigger_counter) {
-    opmonlib::InfoCollector tmp_ic;
-    dunedaq::ctbmodules::ctbmoduleinfo::LevelTriggerInfo ti;
-    ti.count = llt.second.exchange(0);
-    tmp_ic.add(ti);
-    ci.add("llt_" + std::to_string(llt.first), tmp_ic);
+    dunedaq::ctbmodules::opmon::TriggerInfo ti;
+    ti.set_count(llt.second.exchange(0));
+    publish( std::move(ti), {{ "trigger", "llt_" + std::to_string(llt.first)}} );
   }
 
-  ci.add(module_info);
 }
 
 } // namespace ctbmodules

@@ -28,6 +28,6 @@ message CTBModuleInfo {
 }
 
 //  Message specific for every HLT and LLT enabled
-message TriggerLevelInfo {
+message TriggerInfo {
   uint64 count = 1;
 }
