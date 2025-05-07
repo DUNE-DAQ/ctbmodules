@@ -198,8 +198,7 @@ CTBModule::do_start(const nlohmann::json& startobj)
   // Set this to false early so it doesn't interfere with the start
   m_stop_requested.store(false);
 
-  auto start_params = startobj.get<rcif::cmd::StartParams>();
-  m_run_number.store(start_params.run);
+  m_run_number.store(startobj.at("run").get<daqdataformats::run_number_t>());
 
   m_total_hlt_counter.store(0);
 
@@ -208,7 +207,7 @@ CTBModule::do_start(const nlohmann::json& startobj)
 
   if ( m_has_calibration_stream ) {
     std::stringstream run;
-    run << "run" << start_params.run;
+    run << "run" << m_run_number.load();
     SetCalibrationStream(run.str()) ;
   }
 
