@@ -764,7 +764,7 @@ CTBModule::read_average_buffer_counts()
   }
 }
 
-void CTBModule::get_info(opmonlib::InfoCollector& ci, int /*level*/)
+void CTBModule::generate_opmon_data() 
 {
   dunedaq::ctbmodules::ctbmoduleinfo::CTBModuleInfo module_info;
 

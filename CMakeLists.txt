@@ -13,6 +13,8 @@ find_package(logging REQUIRED)
 find_package(ers REQUIRED)
 find_package(hsilibs REQUIRED)
 
+daq_protobuf_codegen( opmon/*.proto )
+
 daq_add_plugin(CTBModule duneDAQModule            LINK_LIBRARIES hsilibs::hsilibs appfwk::appfwk)
 
 daq_install()
