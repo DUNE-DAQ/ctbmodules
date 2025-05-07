@@ -29,5 +29,5 @@ message CTBModuleInfo {
 
 //  Message specific for every HLT and LLT enabled
 message TriggerLevelInfo {
-  uint64 count = 1
+  uint64 count = 1;
 }
