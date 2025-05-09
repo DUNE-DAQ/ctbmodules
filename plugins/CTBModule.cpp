@@ -15,6 +15,8 @@
 #include "appmodel/CTBHLT.hpp"
 #include "appmodel/CTBLLT.hpp"
 #include "appmodel/CTBCountLLT.hpp"
+#include "appmodel/CTBSockets.hpp"
+#include "appmodel/CTBReceiverSocket.hpp"
 
 #include "CTBModule.hpp"
 #include "CTBModuleIssues.hpp"
@@ -126,7 +128,7 @@ CTBModule::do_configure(const data_t&)
 
   auto conf = m_module ->get_configuration();
 
-  m_receiver_port = conf->get_control_connection_port();
+  m_receiver_port = m_module->get_board()->get_sockets()->get_receiver()->get_port();
   m_timeout = std::chrono::milliseconds( conf->get_connection_timeout_ms() ) ;
 
   auto hostname = conf->get_hostname();
@@ -165,7 +167,7 @@ CTBModule::do_configure(const data_t&)
   // network connection to ctb hardware control
   boost::asio::ip::tcp::resolver resolver( m_control_ios ); 
   boost::asio::ip::tcp::resolver::query query( hostname,
-					       std::to_string(m_receiver_port) ) ; //"np04-ctb-1", 8991
+					       std::to_string(conf->get_control_connection_port()) ) ; //"np04-ctb-1", 8991
   boost::asio::ip::tcp::resolver::iterator iter = resolver.resolve(query) ;
 
   m_endpoint = iter->endpoint(); 
