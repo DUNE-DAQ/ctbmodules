@@ -171,8 +171,6 @@ CTBModule::do_configure(const data_t&)
   boost::asio::ip::tcp::resolver::iterator iter = resolver.resolve(query) ;
 
   m_endpoint = iter->endpoint(); 
- 
-  // TODO should we put this into a try?
   m_control_socket.connect( m_endpoint );
 
   // if necessary, set the calibration stream
@@ -184,8 +182,13 @@ CTBModule::do_configure(const data_t&)
 						       ; 
   }
 
+  // at this point we have to find the hostname to tell the board what to get
+  boost::asio::ip::tcp::resolver::query query_for_local(boost::asio::ip::host_name(), "");
+  iter = resolver.resolve(query_for_local);
+  
   // create the json string
-  auto json_conf = m_module->get_board()->get_ctb_json(*session);
+  auto json_conf = m_module->get_board()->get_ctb_json(*session, iter->endpoint().address().to_string());
+
   auto json_dump = json_conf.dump();
 
   TLOG() << "Sending configuration: " << json_dump;
@@ -701,7 +704,7 @@ bool CTBModule::send_message( const std::string & msg ) {
   m_num_control_messages_sent++;
 
   boost::asio::write( m_control_socket, boost::asio::buffer( msg ), error ) ;
-  boost::array<char, 1024> reply_buf{" "} ;
+  boost::array<char, 4096> reply_buf{" "} ;
   m_control_socket.read_some( boost::asio::buffer(reply_buf ), error);
   std::stringstream raw_answer( std::string(reply_buf .begin(), reply_buf .end() ) ) ;
   TLOG_DEBUG(1) << get_name() << ": Unformatted answer: " << raw_answer.str(); 
