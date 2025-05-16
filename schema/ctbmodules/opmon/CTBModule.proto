@@ -13,7 +13,6 @@ message CTBModuleInfo {
   bool ctb_hardware_configured = 6;
 
   // HSI interface
-  uint64 sent_hsi_events_counter = 11;  // Number of sent HSIEvents so far
   uint64 failed_to_send_hsi_events_counter = 12; // Number of failed send attempts so far
 
   // timestamps
