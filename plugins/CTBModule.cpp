@@ -35,7 +35,7 @@
  * @brief Name used by TRACE TLOG calls from this source file
  */
 #define TRACE_NAME "CTBModule" // NOLINT
-#define TLVL_ENTER_EXIT_METHODS 10
+#define TLVL_ENTER_EXIT_METHODS 10 
 #define TLVL_CTB_MODULE 15
 #define CTB_HSI_FRAME_VERSION 0x1
 #define CTB_HSI_DET_ID 0x1
@@ -161,7 +161,7 @@ CTBModule::do_configure(const data_t&)
   auto beam_llts = board->get_beam_LLTs();
   for (const auto& llt : beam_llts) { if (! llt->disabled(*session)) m_llt_trigger_counter[id_to_idx[llt->UID()]] = 0; }
 
-  auto crt_llts = board->get_crt_LLTs();
+  auto crt_llts = board->get_CRT_LLTs();
   for (const auto& llt : crt_llts) { if (! llt->disabled(*session)) m_llt_trigger_counter[id_to_idx[llt->UID()]] = 0; }
 
   // network connection to ctb hardware control
@@ -221,8 +221,7 @@ CTBModule::do_start(const nlohmann::json& startobj)
   if ( send_message( "{\"command\":\"StartRun\"}" )  ) {
     m_is_running.store(true);
     TLOG_DEBUG(1) << get_name() << ": successfully started";
-  }
-  else{
+  } else{
     throw CTBCommunicationError(ERS_HERE, "Unable to start CTB");
   }
 
