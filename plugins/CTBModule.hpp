@@ -9,8 +9,8 @@
  * received with this code.
  */
 
-#ifndef CTBMODULE_PLUGINS_CTBModule_HPP_
-#define CTBMODULE_PLUGINS_CTBModule_HPP_
+#ifndef CTBMODULES_PLUGINS_CTBMODULE_HPP_
+#define CTBMODULES_PLUGINS_CTBMODULE_HPP_
 
 #include "appfwk/DAQModule.hpp"
 #include "appmodel/CTBModule.hpp"
@@ -22,6 +22,8 @@
 
 #include <ers/Issue.hpp>
 
+#include "ctbmodules/opmon/CTBModule.pb.h"
+
 #include "CTBPacketContent.hpp"
 
 #include <memory>
@@ -30,6 +32,7 @@
 #include <fstream>
 #include <shared_mutex>
 #include <map>
+#include <deque>
 
 #include <boost/asio.hpp>
 #include <boost/array.hpp>
@@ -38,7 +41,7 @@
 namespace dunedaq {
 namespace ctbmodules {
 
-typedef std::pair<uint64_t,uint64_t> ts_payload;
+  typedef std::pair<uint64_t,uint64_t> ts_payload;  // NOLINT
 
 /**
  * @brief CTBModule provides the command and readout interface to the Central Trigger Board hardware
@@ -75,18 +78,9 @@ private:
   std::atomic<bool> m_stop_requested;
   std::atomic<bool> m_is_configured;
 
-  /*const */unsigned int m_receiver_port;
+  unsigned int m_receiver_port;
   std::chrono::microseconds m_timeout;
-  std::atomic<unsigned int> m_n_TS_words;
   std::atomic<bool> m_error_state;
-
-  std::atomic<unsigned int> m_total_hlt_counter;
-  std::atomic<unsigned int> m_ts_word_counter;
-
-  size_t m_hlt_range = 20;
-  size_t m_llt_range = 25;
-  std::map<size_t, std::atomic<unsigned int>> m_hlt_trigger_counter;
-  std::map<size_t, std::atomic<unsigned int>> m_llt_trigger_counter;
 
   boost::asio::io_service m_control_ios;
   boost::asio::io_service m_receiver_ios;
@@ -101,10 +95,10 @@ private:
 
 
   // Commands
-  void do_configure(const nlohmann::json& obj);
-  void do_start(const nlohmann::json& startobj);
-  void do_stop(const nlohmann::json& obj);
-  void do_scrap(const nlohmann::json& /*obj*/){}
+  void do_configure(const nlohmann::json& obj) override;
+  void do_start(const nlohmann::json& startobj) override;
+  void do_stop(const nlohmann::json& obj) override;
+  void do_scrap(const nlohmann::json& /*obj*/) override{};
 
   void send_reset() ;
   void send_config(const std::string & config);
@@ -114,20 +108,25 @@ private:
   std::shared_ptr<appfwk::ConfigurationManager> m_cfg;
   using conf_t = appmodel::CTBModule;
   const conf_t* m_module = nullptr;
-
+  
   std::atomic<daqdataformats::run_number_t> m_run_number;
 
   // Threading
   dunedaq::utilities::WorkerThread m_thread_;
   void do_hsi_work(std::atomic<bool>&);
+  // variables for geo_id to construct the HSI frame
+  // These are defined as uint32 in the schema, but given the way the HSI frame is consctructed from this it is unsusable.
+  // THe HSI frame uses 4 Bits for the slot and 10 Bits for the crate and 6 for the DetID. So here I'm overiding the types
+  uint16_t m_det;  // NOLINT
+  uint16_t m_crate;  // NOLINT
+  uint16_t m_slot;   // NOLINT
 
   // Generate HSI Frame/Event
-  void send_matched_trigger_word(const content::word::trigger_t&, uint64_t);
-  void match_between_buffers(std::queue<content::word::trigger_t>&, std::queue<ts_payload>&, uint64_t, content::word::word_type);
+  void send_matched_trigger_word(const content::word::trigger_t&, uint64_t);  // NOLINT
+  void match_between_buffers(std::queue<content::word::trigger_t>&, std::queue<ts_payload>&, uint64_t, content::word::word_type);  // NOLINT
 
-  static bool check_repeated_word(ts_payload&, ts_payload&, uint64_t);
+  static bool check_repeated_word(ts_payload&, ts_payload&, uint64_t);  // NOLINT
   
-
   template<typename T>
   bool read(T &obj);
 
@@ -145,9 +144,28 @@ private:
   std::chrono::steady_clock::time_point m_last_calibration_file_update;
 
   // metric utilities
-  std::atomic<unsigned long> m_run_HLT_counter = 0;
-  std::atomic<unsigned long> m_run_LLT_counter;
-  std::atomic<unsigned long> m_run_channel_status_counter = 0;
+  using general_metric_t = dunedaq::ctbmodules::opmon::CTBModuleInfo;
+  using channel_metric_t = dunedaq::ctbmodules::opmon::TriggerInfo;
+
+  using const_total_hlt_counter_t = std::invoke_result<decltype(&general_metric_t::total_hlt_count),
+						       general_metric_t>::type;
+  std::atomic<std::remove_const<const_total_hlt_counter_t>::type> m_total_hlt_counter;
+  
+  using const_ts_word_counter_t = std::invoke_result<decltype(&general_metric_t::ts_word_count),
+						     general_metric_t>::type;
+  std::atomic<std::remove_const<const_ts_word_counter_t>::type> m_ts_word_counter;
+
+  size_t m_hlt_range = 20;
+  size_t m_llt_range = 25;
+  using const_trigger_counter_t = std::invoke_result<decltype(&channel_metric_t::count),
+						     channel_metric_t>::type;
+  using trigger_counter_t = std::remove_const<const_ts_word_counter_t>::type;
+  std::map<size_t, std::atomic<trigger_counter_t>> m_hlt_trigger_counter;
+  std::map<size_t, std::atomic<trigger_counter_t>> m_llt_trigger_counter;
+
+  std::atomic<trigger_counter_t> m_run_HLT_counter = 0;
+  std::atomic<trigger_counter_t> m_run_LLT_counter = 0;
+  std::atomic<trigger_counter_t> m_run_channel_status_counter = 0;
 
   // monitoring
   std::deque<uint> m_buffer_counts; // NOLINT(build/unsigned)
@@ -155,15 +173,18 @@ private:
   void update_buffer_counts(uint new_count); // NOLINT(build/unsigned)
   double read_average_buffer_counts();
 
-  std::atomic<int> m_num_control_messages_sent;
-  std::atomic<int> m_num_control_responses_received;
-  std::atomic<uint64_t> m_last_readout_hlt_timestamp; // NOLINT(build/unsigned)
+  using const_message_counter_t = std::invoke_result<decltype(&general_metric_t::num_control_messages_sent),
+                                                     general_metric_t>::type;
+  using message_counter_t =  std::remove_const<const_message_counter_t>::type;
+  std::atomic<message_counter_t> m_num_control_messages_sent = 0;
+  std::atomic<message_counter_t> m_num_control_responses_received = 0;
+  std::atomic<uint64_t> m_last_readout_hlt_timestamp = 0; // NOLINT(build/unsigned)
 
 };
-} // namespace ctbmodule
+} // namespace ctbmodules
 } // namespace dunedaq
 
-#endif // CTBMODULE_PLUGINS_CTBModule_HPP_
+#endif // CTBMODULES_PLUGINS_CTBMODULE_HPP_ 
 
 // Local Variables:
 // c-basic-offset: 2

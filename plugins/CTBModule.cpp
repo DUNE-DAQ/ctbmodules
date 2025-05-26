@@ -7,6 +7,8 @@
  * received with this code.
  */
 
+#include "confmodel/GeoId.hpp"
+
 #include "appmodel/CTBConf.hpp"
 #include "appmodel/CTBCalibrationStream.hpp"
 #include "appmodel/CTBoardConf.hpp"
@@ -24,26 +26,29 @@
 #include "iomanager/IOManager.hpp"
 #include "logging/Logging.hpp"
 
-#include "ctbmodules/opmon/CTBModule.pb.h"
-
 #include <chrono>
 #include <string>
 #include <thread>
 #include <vector>
+#include <memory>
+#include <map>
+#include <queue>
+#include <utility>
 
 /**
  * @brief Name used by TRACE TLOG calls from this source file
  */
 #define TRACE_NAME "CTBModule" // NOLINT
-#define TLVL_ENTER_EXIT_METHODS 10 
-#define TLVL_CTB_MODULE 15
-#define CTB_HSI_FRAME_VERSION 0x1
-#define CTB_HSI_DET_ID 0x1
-#define CTB_HSI_CRATE_ID 0x0
-#define CTB_HSI_SLOT_ID 0x0
+enum
+{
+  TLVL_ENTER_EXIT_METHODS = 10,
+  TLVL_CTB_MODULE = 15
+};
+  
+constexpr uint16_t CTB_HSI_FRAME_VERSION = 0x1;  // NOLINT
 
-namespace dunedaq {
-namespace ctbmodules {
+using namespace dunedaq;
+using namespace ctbmodules;
 
 CTBModule::CTBModule(const std::string& name)
   : hsilibs::HSIEventSender(name)
@@ -144,7 +149,13 @@ CTBModule::do_configure(const data_t&)
   for(size_t i = 0; i < m_hlt_range; i++) id_to_idx["HLT_" + std::to_string(i)] = i;
   for(size_t i = 0; i < m_llt_range; i++) id_to_idx["LLT_" + std::to_string(i)] = i;
 
+  // configuring the board   
   auto board = m_module->get_board();
+  auto geo_id = board->get_geo_id();
+  m_det = geo_id->get_detector_id();
+  m_crate = geo_id->get_crate_id();
+  m_slot = geo_id->get_slot_id();
+  
   const auto & misc = board->get_misc();
   auto session = m_cfg->session();
   // HLTs
@@ -244,10 +255,9 @@ CTBModule::do_stop(const nlohmann::json& /*stopobj*/)
   if(send_message( "{\"command\":\"StopRun\"}" ) ){
     TLOG_DEBUG(1) << get_name() << ": successfully stopped";
     m_is_running.store( false ) ;
-  }
-  else{
+  } else {
     throw CTBCommunicationError(ERS_HERE, "Unable to stop CTB");
-  }
+  } 
   m_thread_.stop_working_thread();
 
   m_run_HLT_counter=0;
@@ -287,10 +297,9 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
   content::tcp_header_t head ;
   head.packet_size = 0;
   content::word::word_t temp_word ;
-  boost::system::error_code receiving_error;
   bool connection_closed = false ;
-  uint64_t ch_stat_beam, ch_stat_crt, ch_stat_pds;
-  uint64_t prev_timestamp = 0;
+  uint64_t ch_stat_beam, ch_stat_crt, ch_stat_pds;  // NOLINT
+  uint64_t prev_timestamp = 0;  // NOLINT
   ts_payload prev_hlt, prev_llt, prev_ch_stat;
   ts_payload curr_hlt, curr_llt, curr_ch_stat;
   // buffers for word matching. buf_a are the trigger words, buf_b are corresponding payloads
@@ -327,7 +336,7 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
       }
       // put it in the calibration stream
       if ( m_has_calibration_stream ) {
-        m_calibration_file.write( reinterpret_cast<const char*>( & temp_word ), word_size ) ;
+        m_calibration_file.write( reinterpret_cast<const char*>( & temp_word ), word_size ) ;   // NOLINT
         m_calibration_file.flush() ;
       }          // word printing in calibration stream
       
@@ -336,11 +345,9 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
         ++m_ts_word_counter;
         TLOG_DEBUG(9) << "Received timestamp word! TS: "+temp_word.timestamp;
         prev_timestamp = temp_word.timestamp;
-      }
-
-      else if ( IsFeedbackWord( temp_word ) ) {
+      } else if ( IsFeedbackWord( temp_word ) ) {
         m_error_state.store( true ) ;
-        content::word::feedback_t * feedback = reinterpret_cast<content::word::feedback_t*>( & temp_word ) ;
+        content::word::feedback_t * feedback = reinterpret_cast<content::word::feedback_t*>( & temp_word ) ;  // NOLINT
         TLOG_DEBUG(7) << "Received feedback word!";
 
         TLOG_DEBUG(8) << get_name() << ": Feedback word: " << std::endl
@@ -350,39 +357,40 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
                                                   << " \t Code -> " << feedback -> code << std::endl
                                                   << " \t Source -> " << feedback -> source << std::endl
                                                   << " \t Padding -> " << feedback -> padding << std::dec << std::endl ;
-      } else if (temp_word.word_type == content::word::t_gt)
-      {
+      } else if (temp_word.word_type == content::word::t_gt) {
         TLOG_DEBUG(3) << "Received HLT word! TS: " + temp_word.timestamp;
-        content::word::trigger_t * hlt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word );
+        content::word::trigger_t * hlt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word );   //NOLINT
         curr_hlt = {hlt_word->timestamp, (hlt_word->trigger_word & 0x1FFFFFFFFFFFFFFF)};
         if (check_repeated_word(curr_hlt, prev_hlt, temp_word.word_type)) continue;
         match_buf_a_hlts.push(*hlt_word);
         // Count the total HLTs and each specific one
         ++m_run_HLT_counter;
         ++m_total_hlt_counter;
-        for (auto &hlt : m_hlt_trigger_counter) { if( (hlt_word->trigger_word >> hlt.first) & 0x1 ) ++hlt.second; }
+        for (auto &hlt : m_hlt_trigger_counter) {
+	  if( (hlt_word->trigger_word >> hlt.first) & 0x1 )
+	    ++hlt.second;
+	}
         m_last_readout_hlt_timestamp = temp_word.timestamp;
         prev_hlt = curr_hlt;
-      }
-      else if (temp_word.word_type == content::word::t_lt)
-      {
+      } else if (temp_word.word_type == content::word::t_lt)  {
         TLOG_DEBUG(5) << "Received LLT word! TS: " + temp_word.timestamp;
-        content::word::trigger_t * llt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word ) ;
+        content::word::trigger_t * llt_word = reinterpret_cast<content::word::trigger_t*>( & temp_word ) ;   //NOLINT
         curr_llt = {llt_word->timestamp, (llt_word->trigger_word & 0xFFFFFFFF)};
         if (check_repeated_word(curr_llt, prev_llt, temp_word.word_type)) continue;
         match_buf_a_llts.push(*llt_word);
         match_buf_b_llts.push(curr_llt);
 
         ++m_run_LLT_counter;
-        for (auto &llt : m_llt_trigger_counter) { if( (llt_word->trigger_word >> llt.first) & 0x1 ) ++llt.second; }
+        for (auto &llt : m_llt_trigger_counter) {
+	  if( (llt_word->trigger_word >> llt.first) & 0x1 )
+	    ++llt.second;
+	}
         prev_llt = curr_llt;
-      }
-      else if (temp_word.word_type == content::word::t_ch)
-      {
+      } else if (temp_word.word_type == content::word::t_ch) {
 
-        content::word::ch_status_t * ch_stat_word = reinterpret_cast<content::word::ch_status_t*>( & temp_word ) ;
+        content::word::ch_status_t * ch_stat_word = reinterpret_cast<content::word::ch_status_t*>( & temp_word ) ;  // NOLINT 
         // The channel status only has 60b TS so complete the upper 4b from the TS Word. (fyi 60b rolls over >500yr @ 62.5MHz) 
-        uint64_t corrected_ts = ((prev_timestamp & 0xF000000000000000) | ch_stat_word->timestamp);
+        uint64_t corrected_ts = ((prev_timestamp & 0xF000000000000000) | ch_stat_word->timestamp);  // NOLINT
         TLOG_DEBUG(6) << "Received Channel Status word! TS: " + corrected_ts;
         ch_stat_beam = ch_stat_word->get_beam();
         ch_stat_crt  = ch_stat_word->get_crt();
@@ -396,7 +404,7 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
         prev_ch_stat = curr_ch_stat;
 
         ++m_run_channel_status_counter;
-      }
+      }  // else if on word types
       // do matching
       match_between_buffers(match_buf_a_hlts, match_buf_b_llts, 
           prev_hlt.first, content::word::word_type::t_gt);
@@ -444,7 +452,7 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
 
 }
 
-bool CTBModule::check_repeated_word(ts_payload& curr_word, ts_payload& prev_word, uint64_t wtype){
+  bool CTBModule::check_repeated_word(ts_payload& curr_word, ts_payload& prev_word, uint64_t wtype){  // NOLINT
   if (curr_word.first == prev_word.first) { // words with repeated timestamp. Not good!
     std::stringstream msg;
     msg << "Multiple words have the same timestamp, Using the first one. Word type: ";
@@ -466,14 +474,14 @@ bool CTBModule::check_repeated_word(ts_payload& curr_word, ts_payload& prev_word
   return false;
 }
 
-void CTBModule::send_matched_trigger_word(const content::word::trigger_t& word, uint64_t payload) {
+  void CTBModule::send_matched_trigger_word(const content::word::trigger_t& word, uint64_t payload) {  // NOLINT
   // Send HSI data to a DLH
-  std::array<uint32_t, 7> hsi_struct;
+  std::array<uint32_t, 7> hsi_struct;   // NOLINT
   bool is_hlt = word.IsHLT();
   hsi_struct[0] = (is_hlt << 26)            |  // link
-                  (CTB_HSI_SLOT_ID << 22)   |  
-                  (CTB_HSI_CRATE_ID << 12)  | 
-                  (CTB_HSI_DET_ID << 6)     |
+                  (m_slot << 22)   |  
+                  (m_crate << 12)  | 
+                  (m_det << 6)     |
                   CTB_HSI_FRAME_VERSION
                   ;
   hsi_struct[1] = word.timestamp;        // ts low
@@ -495,22 +503,21 @@ void CTBModule::send_matched_trigger_word(const content::word::trigger_t& word, 
       << "\n";
   if (is_hlt) {
     send_raw_hsi_data(hsi_struct, m_hlt_hsi_data_sender.get());
-    // TODO properly fill device id
-    dfmessages::HSIEvent event(0x1, word.trigger_word, word.timestamp, m_run_HLT_counter, m_run_number);
+    dfmessages::HSIEvent event(m_det, word.trigger_word, word.timestamp, m_run_HLT_counter, m_run_number);
     send_hsi_event(event);
-  }
-  else {
+  } else {
     send_raw_hsi_data(hsi_struct, m_llt_hsi_data_sender.get());
   }
   
 }
 
-void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_a, std::queue<ts_payload>& buf_b, uint64_t timeout_reference, content::word::word_type buf_a_wtype) {
+void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_a, std::queue<ts_payload>& buf_b,
+				      uint64_t timeout_reference, content::word::word_type buf_a_wtype) {  // NOLINT
   bool is_hlt = (buf_a_wtype == content::word::word_type::t_gt);
   while (buf_a.size() > 0) {
     content::word::trigger_t trigger = buf_a.front();
-    uint64_t trigger_ts = trigger.timestamp;
-    uint64_t trigger_word = trigger.trigger_word;
+    auto trigger_ts = trigger.timestamp;
+    auto trigger_word = trigger.trigger_word;
     if (timeout_reference > (trigger_ts + 100)) {
       std::stringstream msg;
       msg << "Time out while waiting for a match for the "<< (is_hlt? "HLT" : "LLT")
@@ -522,25 +529,22 @@ void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_
     }
     if (buf_b.size() == 0) break; // no input to match yet. Return for now, wait for matching input to come
     while (buf_b.size() > 0) {
-      uint64_t input_ts = buf_b.front().first;
+      auto input_ts = buf_b.front().first;
       if (input_ts < (trigger_ts - 1)) { // word is too early. No longer needed
         if (is_hlt) last_popped_llt = buf_b.front();
         else last_popped_chstatus = buf_b.front();
         buf_b.pop();
-      }
-      else if (input_ts == (trigger_ts - 1)) { // match is found
+      } else if (input_ts == (trigger_ts - 1)) { // match is found
         send_matched_trigger_word(trigger, buf_b.front().second);
         buf_a.pop();
         if (is_hlt) last_popped_llt = buf_b.front();
         else last_popped_chstatus = buf_b.front();
         buf_b.pop();
         break;
-      }
-      else { // buf_b is already past the match window. No matching is found, error!
+      } else { // buf_b is already past the match window. No matching is found, error!
         if (is_hlt && (trigger_word == 0x1 || trigger_word == (0x1 << 16))) { // Fake HLTs, no matching is OK
           send_matched_trigger_word(trigger, 0);
-        } 
-        else{
+        } else{
           std::stringstream msg;
           msg << "No match found for " << (is_hlt? "HLT" : "LLT")
               << ": TS = " << trigger_ts << ", trigger word = 0x" << std::hex << trigger_word
@@ -550,7 +554,7 @@ void CTBModule::match_between_buffers(std::queue<content::word::trigger_t>& buf_
         }
         buf_a.pop();
         break;
-      }
+      } 
     } // end loop buf_b
   } // end loop buf_a
   // Don't let buf_b get too long (e.g. when LLT rate is high but HLT rate is low)
@@ -610,12 +614,12 @@ void CTBModule::init_calibration_file() {
   if ( ! m_has_calibration_stream ){
     return ;
   } 
-  char file_name[200] = "" ;
-  time_t rawtime;
-  time( & rawtime ) ;
-  struct tm * timeinfo = localtime( & rawtime ) ;
-  strftime( file_name, sizeof(file_name), "%F_%H.%M.%S.calib", timeinfo );
-  std::string global_name = m_calibration_dir + m_calibration_prefix + file_name ;
+  std::array<char, 200> file_name;
+  time_t rawtime = time( nullptr ) ;
+  struct tm timeinfo;
+  localtime_r( & rawtime, & timeinfo) ;
+  strftime( file_name.data(), file_name.size(), "%F_%H.%M.%S.calib", & timeinfo );
+  std::string global_name = m_calibration_dir + m_calibration_prefix + file_name.data() ;
   m_calibration_file.open( global_name, std::ofstream::binary ) ;
   m_last_calibration_file_update = std::chrono::steady_clock::now();
   // _calibration_file.setf ( std::ios::hex, std::ios::basefield );
@@ -670,10 +674,9 @@ void CTBModule::send_config( const std::string & config ) {
   if ( send_message( config ) ) {
 
     m_is_configured.store(true) ;
-
-  }
-  else{
-      throw CTBCommunicationError(ERS_HERE, "Unable to configure CTB");
+    
+  } else {
+    throw CTBCommunicationError(ERS_HERE, "Unable to configure CTB");
   }
 }
 
@@ -686,11 +689,10 @@ void CTBModule::send_reset() {
     m_is_running.store(false);
     m_is_configured.store(false);
 
-  }
-  else{
+  } else {
     ers::error(CTBCommunicationError(ERS_HERE, "Unable to reset CTB"));
   }
-
+  
 }
 
 bool CTBModule::send_message( const std::string & msg ) {
@@ -722,14 +724,11 @@ bool CTBModule::send_message( const std::string & msg ) {
     if ( type.find("error") != std::string::npos || type.find("Error") != std::string::npos || type.find("ERROR") != std::string::npos ) {
       ers::error(CTBMessage(ERS_HERE, messages[i]["message"].dump()));
       ret = false ;
-    }
-    else if ( type.find("warning") != std::string::npos || type.find("Warning") != std::string::npos || type.find("WARNING") != std::string::npos ) {
+    } else if ( type.find("warning") != std::string::npos || type.find("Warning") != std::string::npos || type.find("WARNING") != std::string::npos ) {
       ers::warning(CTBMessage(ERS_HERE, messages[i]["message"].dump()));
-    }
-    else if ( type.find("info") != std::string::npos || type.find("Info") != std::string::npos || type.find("INFO") != std::string::npos) {
+    } else if ( type.find("info") != std::string::npos || type.find("Info") != std::string::npos || type.find("INFO") != std::string::npos) {
       TLOG() << "Message from the board: " << messages[i]["message"].dump();
-    }
-    else {
+    } else {
       std::stringstream blob;
       blob << messages[i] ;
       TLOG() << get_name() << ": Unformatted from the board: " << blob.str();
@@ -754,11 +753,8 @@ CTBModule::read_average_buffer_counts()
 {
   std::unique_lock mon_data_lock(m_buffer_counts_mutex);
 
-  double total_counts;
-  uint32_t number_of_counts; // NOLINT(build/unsigned)
-
-  total_counts = 0;
-  number_of_counts = m_buffer_counts.size();
+  double total_counts = 0;;
+  uint32_t number_of_counts = m_buffer_counts.size(); // NOLINT(build/unsigned)
 
   if (number_of_counts) {
     for (uint i = 0; i < number_of_counts; ++i) { // NOLINT(build/unsigned)
@@ -792,19 +788,16 @@ void CTBModule::generate_opmon_data()
   for (auto &hlt : m_hlt_trigger_counter) {
     dunedaq::ctbmodules::opmon::TriggerInfo ti;
     ti.set_count(hlt.second.exchange(0));
-    publish( std::move(ti), {{ "trigger", "hlt_" + std::to_string(hlt.first)}} );
+    publish( std::move(ti), {{ "trigger", "HLT_" + std::to_string(hlt.first)}} );
   }
 
   for (auto &llt : m_llt_trigger_counter) {
     dunedaq::ctbmodules::opmon::TriggerInfo ti;
     ti.set_count(llt.second.exchange(0));
-    publish( std::move(ti), {{ "trigger", "llt_" + std::to_string(llt.first)}} );
+    publish( std::move(ti), {{ "trigger", "LLT_" + std::to_string(llt.first)}} );
   }
 
 }
-
-} // namespace ctbmodules
-} // namespace dunedaq
 
 DEFINE_DUNE_DAQ_MODULE(dunedaq::ctbmodules::CTBModule)
 
