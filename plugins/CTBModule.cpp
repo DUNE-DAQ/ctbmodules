@@ -450,9 +450,9 @@ CTBModule::do_hsi_work(std::atomic<bool>& running_flag)
   
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Exiting do_work() method";
 
-}
+} // NOLINT
 
-  bool CTBModule::check_repeated_word(ts_payload& curr_word, ts_payload& prev_word, uint64_t wtype){  // NOLINT
+bool CTBModule::check_repeated_word(ts_payload& curr_word, ts_payload& prev_word, uint64_t wtype){  // NOLINT
   if (curr_word.first == prev_word.first) { // words with repeated timestamp. Not good!
     std::stringstream msg;
     msg << "Multiple words have the same timestamp, Using the first one. Word type: ";
