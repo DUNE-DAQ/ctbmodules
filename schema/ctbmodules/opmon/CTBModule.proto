@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package dunedaq.ctbmodules.opmon;
+
+message CTBModuleInfo {
+
+  // board comunication
+  uint32 num_control_messages_sent = 1;  // Number of control messages sent to CTB
+  uint32 num_control_responses_received = 2;  // Number of control message responses received from CTB
+
+  // board status
+  bool ctb_hardware_running = 5;  
+  bool ctb_hardware_configured = 6;
+
+  // HSI interface
+  uint64 failed_to_send_hsi_events_counter = 12; // Number of failed send attempts so far
+
+  // timestamps
+  uint64 last_sent_timestamp = 15;  // Timestamp of the last sent HSIEvent
+  uint64 last_readout_timestamp = 16;  // Timestamp of the last read HLT word
+
+  // CTB related properties
+  double average_buffer_occupancy = 21;  // Average (word) occupancy of buffer in CTB firmware.
+  uint64 total_hlt_count = 25;  // Total HLT count for a run.
+  uint64 ts_word_count = 26;  // Timestamp word count. Fixed frequency heartbeat.
+ 
+}
+
+//  Message specific for every HLT and LLT enabled
+message TriggerInfo {
+  uint64 count = 1;
+}
