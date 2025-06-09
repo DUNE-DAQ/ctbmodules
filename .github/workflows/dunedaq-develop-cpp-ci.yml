@@ -1,0 +1,24 @@
+name: build-develop
+
+# Controls when the action will run. Workflow runs when manually triggered using the UI
+# or API.
+on:
+  push:
+    branches: 
+      - develop
+      - patch/*
+      - prep-release/*
+    paths-ignore:
+      - 'docs/**'
+      - '.github/**'
+  pull_request:
+    branches: [ develop ]
+  schedule:
+    - cron: "0 9 * * *"
+
+  workflow_dispatch:
+
+jobs:
+  build_develop_dispatch:
+    name: Build against the development release
+    uses: DUNE-DAQ/.github/.github/workflows/dunedaq-develop-cpp-ci.yml@develop
