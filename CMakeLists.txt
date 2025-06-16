@@ -11,6 +11,7 @@ find_package(opmonlib REQUIRED)
 find_package(logging REQUIRED)
 find_package(ers REQUIRED)
 find_package(hsilibs REQUIRED)
+find_package(daqconf REQUIRED)
 
 daq_protobuf_codegen( opmon/*.proto )
 

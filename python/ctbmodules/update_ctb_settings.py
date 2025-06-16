@@ -2,12 +2,103 @@ from pathlib import Path
 import json
 
 import conffwk
+import daqconf.enable as enable
 
 def update_ctb_settings(db_file:Path, jsonfile:Path, session_name:str|None) -> None :
     print (f"Setting {db_file} to {jsonfile}")
 
     json_data = json.load(open(jsonfile))
+    ctb = json_data["ctb"]
 
     db = conffwk.Configuration('oksconflibs:' + db_file)
+    set_sockets(db, ctb["sockets"])
 
+    ## object to be enabled to be return in a list
+    to_be_enabled = set_misc( db, ctb["misc"])
+    
+    
+    triggers = db.get_dals("CTBTrigger")
+    all_triggers = [t.id for t in triggers]
+    to_be_disabled = []
+    for t in all_triggers :
+        if t not in to_be_enabled :
+            to_be_disabled.append(t)
+
+    print("Enabling:",to_be_enabled)
+    print("Disabling:",to_be_disabled)
+
+    if not session_name :
+        session_name = db.get_dals("Session")[0].id
+        
+    enable.enable(db_file, False, to_be_enabled, session_name)
+    enable.enable(db_file, True, to_be_disabled, session_name)
+
+def set_misc(db:conffwk.Configuration, misc:dict) -> list[str] :
+
+    oks_misc = db.get_dals("CTBMisc")[0]
+    oks_misc.ch_status = misc["ch_status"]
+    db.update_dal(oks_misc)
+
+    pulser = misc["pulser"]
+    oks_pulser = oks_misc.pulser
+    oks_pulser.enable = pulser["enable"]
+    oks_pulser.frequency = pulser["frequency"]
+    db.update_dal(oks_pulser)
+
+    timing = misc["timing"]
+    oks_timing = oks_misc.timing
+    oks_timing.address = timing["address"]
+    oks_timing.triggers = timing["triggers"]
+    oks_timing.lockout = timing["lockout"]
+
+    db.update_dal(oks_timing)
+
+    db.commit()
+    
+    to_be_enabled = []
+    to_be_enabled += set_random_trigger(db, "HLT_0", misc["randomtrigger_1"])
+    to_be_enabled += set_random_trigger(db, "LLT_0", misc["randomtrigger_2"])
+
+    return to_be_enabled
+
+def set_random_trigger(db:conffwk.Configuration, trigger_id:str, trigger:dict) -> list[str] :
+    oks_trigger=db.get_dal("CTBRandomTrigger", trigger_id)
+    oks_trigger.fixed_freq=trigger["fixed_freq"]
+    oks_trigger.beam_mode=trigger["beam_mode"]
+    oks_trigger.period=trigger["period"]
+    oks_trigger.description=trigger["description"]
+    db.update_dal(oks_trigger)
+    db.commit()
+    
+    if trigger["enable"] :
+        return [trigger_id]
+    return []
+    
+    
+def set_sockets(db:conffwk.Configuration, sockets:dict) -> None :
+
+    oks_sockets = db.get_dals("CTBSockets")[0]
+    
+    oks_receiver = oks_sockets.receiver
+    receiver = sockets["receiver"]
+    oks_receiver.rollover = receiver["rollover"]
+    oks_receiver.port = receiver["port"]
+    db.update_dal(oks_receiver)
+    
+    oks_monitor = oks_sockets.monitor
+    monitor = sockets["monitor"]
+    oks_monitor.enable = monitor["enable"]
+    oks_monitor.port = monitor["port"]
+    db.update_dal(oks_monitor)
+    
+    oks_statistics = oks_sockets.statistics
+    stat = sockets["statistics"]
+    oks_statistics.enable= stat["enable"]
+    oks_statistics.port = stat["port"]
+    oks_statistics.updt_period = stat["updt_period"]
+    db.update_dal(oks_statistics)
+
+    db.commit()
+    
+    
     
