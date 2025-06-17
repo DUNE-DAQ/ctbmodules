@@ -17,6 +17,8 @@ def update_ctb_settings(db_file:Path, jsonfile:Path, session_name:str|None) -> N
     to_be_enabled = set_misc( db, ctb["misc"])
     to_be_enabled += set_hlts( db, ctb["HLT"]["trigger"])  ## Remember that the HLT block contains other parts which are not stored in our schema, so they are not configurable
     to_be_enabled += set_subsystems( db, ctb["subsystems"])
+
+    db.commit()
     
     triggers = db.get_dals("CTBTrigger")
     all_triggers = [t.id for t in triggers]
@@ -53,10 +55,8 @@ def set_beam(db:conffwk.Configuration, beam:dict) -> list[str] :
     oks.delays = beam["delays"]
     db.update_dal(oks)
 
-    enable = set_beam_llts(db, beam["triggers"])
-    
-    db.commit()
-    return enable
+    return set_beam_llts(db, beam["triggers"])
+
 
 def set_beam_llts(db:conffwk.Configuration, triggers:dict) -> list[str] :
 
@@ -80,11 +80,8 @@ def set_crt(db:conffwk.Configuration, crt:dict) -> list[str] :
     oks.delays = crt["delays"]
     db.update_dal(oks)
 
-    enable = set_crt_llts(db, crt["triggers"])
+    return set_crt_llts(db, crt["triggers"])
     
-    db.commit()
-    return enable
-
 def set_crt_llts(db:conffwk.Configuration, triggers:dict) -> list[str] :
 
     enable = []
@@ -109,8 +106,7 @@ def set_pds(db:conffwk.Configuration, pds:dict) -> None :
     db.update_dal(oks)
 
     set_pds_llts(db, pds["triggers"])
-    
-    db.commit()
+   
 
 def set_pds_llts(db:conffwk.Configuration, triggers:dict) -> None :
     for t in triggers :
@@ -131,7 +127,6 @@ def set_hlts(db:conffwk.Configuration, hlts:dict) -> list[str] :
         if d["enable"] :
             enable.append(d["id"])
             
-    db.commit()
     return enable
 
 def set_hlt(db:conffwk.Configuration, hlt:dict) -> None :
@@ -162,8 +157,6 @@ def set_misc(db:conffwk.Configuration, misc:dict) -> list[str] :
 
     db.update_dal(oks_timing)
 
-    db.commit()
-    
     to_be_enabled = []
     to_be_enabled += set_random_trigger(db, "HLT_0", misc["randomtrigger_1"])
     to_be_enabled += set_random_trigger(db, "LLT_0", misc["randomtrigger_2"])
@@ -177,8 +170,7 @@ def set_random_trigger(db:conffwk.Configuration, trigger_id:str, trigger:dict) -
     oks_trigger.period=trigger["period"]
     oks_trigger.description=trigger["description"]
     db.update_dal(oks_trigger)
-    db.commit()
-    
+        
     if trigger["enable"] :
         return [trigger_id]
     return []
@@ -207,7 +199,6 @@ def set_sockets(db:conffwk.Configuration, sockets:dict) -> None :
     oks_statistics.updt_period = stat["updt_period"]
     db.update_dal(oks_statistics)
 
-    db.commit()
-    
+        
     
     
