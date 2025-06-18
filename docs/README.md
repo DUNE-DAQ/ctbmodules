@@ -24,15 +24,37 @@ git clone ssh://git@gitlab.cern.ch:7999/dune-daq/online/ehn1-daqconfigs.git
 ```
 Or alternatively
 ```bash
-cpm-setup -b fddaq-v5.3.2 eh1-daqconfigs
+cpm-setup -b fddaq-v5.3.2 ehn1-daqconfigs
 ```
 The first one is a direct clone, while the second sets up the configuration repo to do some more advance operation, so the default branches might be a little strange. 
-The second only works if you have setup the `.netrc` file correctly
+Further domentation on the various `cpm-*` commands can be found in [the runconftools documentation](https://github.com/DUNE-DAQ/runconftools/blob/develop/docs/README.md). 
+The second only works if you have setup the `.netrc` file correctly.
 To conclude, just 
 ```bash
 source ehn1-daqconfigs/setup_db_path.sh 
 ```
 
-### Update the ctb configuration
+### Update the CTB configuration
+The ehn1-daqconfigs contains already a valid configuration for the CTB. 
+Due to the implementation of HLTs and LLTs as confmodel::resource, it's best if any branch of ehn1-daqconfigs contains only one version of each. 
+So, as CTB experts the only thing you should do is to update the value of the objects already created in ehn1-daqconfigs. 
 
+In order to do so, there is a script called `update_ctb_settings`. 
+Typical usage is:
+```bash
+update_ctb_settings ehn1-daqconfigs/sessions/np02-session.data.xml <your_json_file> 
+```
+This will do the following:
+ - It will change the value of every objects in the configuration related to the CTB according to the the json file you provide
+ - It will enable/disable HLTs and LLTs according to your configuration
+Please keep in mind that HLTs can also be enabled/disabled via the shifter interface (see dedicated section).
 
+Once you are happy with the changes, you can commit and push the changes on a branch on ehn1-daqconfigs and open a Merge request toward the dedicate branch. 
+
+### Run the CTB configuration
+in order to run, start using the shifter interface in local mode:
+```bash
+runconf-shifter-ui -l -d ehn1-daqconfigs
+```
+From the inerface select which components you need, select which HLTs you want to enable and click `create`. 
+The output of the shifter interface will tell you how to run. 
