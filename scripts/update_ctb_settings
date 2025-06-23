@@ -1,0 +1,21 @@
+#!/bin/env python3
+
+import click
+from pathlib import Path
+import ctbmodules.update_ctb_settings as ctb
+
+@click.command()
+@click.option('--session', '-s', type=str, default=None,
+              help='Session to be used to enable/disable LLTs. If None it will take the first session in the file')
+@click.argument('oks_session_file', type=click.Path(exists=True, dir_okay=False, writable=True))
+@click.argument('jsonfile', type=click.Path(exists=True, dir_okay=False))
+def cli(oks_session_file, jsonfile, session) -> None :
+    """ 
+    Script to take a ctb json file like https://github.com/pennneutrinos/protodune-ctb-configurations/blob/protoDUNE-hd-dunedaq-v4/standalone-configs/random_beam_trig_40Hz.json 
+    and sets the oks representation accordingly
+    """
+    ctb.update_ctb_settings(oks_session_file, jsonfile, session)
+    
+    
+if __name__ == '__main__':
+  cli()
