@@ -1,0 +1,481 @@
+{
+  "ctb": {
+    "sockets": {
+      "receiver": {
+        "description": "Settings to configure the conditions for the data transmission socket",
+        "rollover": 125000,
+        "host": "localhost",
+        "port": 8992
+      },
+      "monitor": {
+        "description": "Socket to send a copy of the CTB data. Not implemented yet",
+        "enable": false,
+        "host": "localhost",
+        "port": 8993
+      },
+      "statistics": {
+        "description": "Socket to send periodic trigger statistics. Not implemented yet",
+        "enable": false,
+        "port": 8994,
+        "updt_period": 1
+      }
+    },
+    "misc": {
+      "randomtrigger_1": {
+        "description": "Random trigger (HLT0)",
+        "enable": false,
+        "fixed_freq": true,
+        "beam_mode": false,
+        "period": 100000
+      },
+      "randomtrigger_2": {
+        "description": "Random trigger (LLT0)",
+        "enable": true,
+        "fixed_freq": true,
+        "beam_mode": false,
+        "period": 1562500
+      },
+      "pulser": {
+        "description": "Test pulser that is routed to the fiber and one of the NIM outputs (back panel)",
+        "enable": false,
+        "frequency": 50
+      },
+      "timing": {
+        "description": "Configuration parameters for the CTB timing system endpoint",
+        "address": "0xF",
+        "triggers": true,
+        "lockout": "0x10"
+      },
+      "ch_status": false,
+      "standalone_enable": true
+    },
+    "HLT": {
+      "command_mask": {
+        "12": "0x0",
+        "13": "0x0",
+        "14": "0x0",
+        "15": "0x0"
+      },
+      "trigger": [
+        {
+          "id": "HLT_1",
+          "description": "Standard beam trigger without particle selection (using random trigger)",
+          "enable": true,
+          "minc": "0x11",
+          "mexc": "0x0",
+          "prescale": "0x1"
+        },
+        {
+          "id": "HLT_2",
+          "description": "Beam trigger with Cherenkov particle selection (H1L1)",
+          "enable": false,
+          "minc": "0xE",
+          "mexc": "0x0",
+          "prescale": "0x1"
+        },
+        {
+          "id": "HLT_3",
+          "description": "Beam trigger with Cherenkov particle selection (H?L1)",
+          "enable": false,
+          "minc": "0xA",
+          "mexc": "0x0",
+          "prescale": "0x1"
+        },
+        {
+          "id": "HLT_4",
+          "description": "Beam Gate only",
+          "enable": false,
+          "minc": "0x10",
+          "mexc": "0x0",
+          "prescale": "0x1"
+        },
+        {
+          "id": "HLT_5",
+          "description": "Off-spill cosmic trigger",
+          "enable": false,
+          "minc": "0x18000",
+          "mexc": "0x40",
+          "prescale": "0x14"
+        },
+        {
+          "id": "HLT_6",
+          "description": "Cosmic trigger any US any DS",
+          "enable": false,
+          "minc": "0x18000",
+          "mexc": "",
+          "prescale": "0x1"
+        },
+        {
+          "id": "HLT_7",
+          "description": "Beam trigger with Cherenkov particle selection (not H1L1)",
+          "enable": false,
+          "minc": "0x2",
+          "mexc": "0xC",
+          "prescale": "0x1"
+        },
+        {
+          "id": "HLT_8",
+          "description": "US Jura DS Saleve",
+          "enable": false,
+          "minc": "0x42000",
+          "mexc": "",
+          "prescale": "0x1"
+        },
+        {
+          "id": "HLT_9",
+          "description": "US Saelve DS Jura",
+          "enable": false,
+          "minc": "0x81000",
+          "mexc": "",
+          "prescale": "0x1"
+        },
+        {
+          "id": "HLT_10",
+          "description": "Pulse Train Trigger: HV current limit threshold ",
+          "enable": false,
+          "minc": "0x80",
+          "mexc": "",
+          "prescale": "0x1"
+        },
+        {
+          "id": "HLT_11",
+          "description": "US Saleve DS Saleve",
+          "enable": false,
+          "minc": "0x3000",
+          "mexc": "",
+          "prescale": "0x1"
+        },
+        {
+          "id": "HLT_12",
+          "description": "US JURA DS Jura",
+          "enable": false,
+          "minc": "0xc0000",
+          "mexc": "",
+          "prescale": "0x1"
+        },
+        {
+          "id": "HLT_13",
+          "description": "Testing PDS trigger",
+          "enable": false,
+          "minc": "",
+          "mexc": "",
+          "prescale": ""
+        },
+        {
+          "id": "HLT_14",
+          "description": "",
+          "enable": false,
+          "minc": "",
+          "mexc": "",
+          "prescale": ""
+        },
+        {
+          "id": "HLT_15",
+          "description": "",
+          "enable": false,
+          "minc": "",
+          "mexc": "",
+          "prescale": ""
+        },
+        {
+          "id": "HLT_16",
+          "description": "",
+          "enable": false,
+          "minc": "",
+          "mexc": "",
+          "prescale": ""
+        },
+        {
+          "id": "HLT_17",
+          "description": "",
+          "enable": false,
+          "minc": "",
+          "mexc": "",
+          "prescale": ""
+        }
+      ]
+    },
+    "subsystems": {
+      "pds": {
+        "channel_mask": "0xFFFFFF",
+        "reshape_length": 5,
+        "delays": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "dac_thresholds": [
+          2188,
+          2179,
+          2185,
+          2191,
+          2167,
+          2200,
+          2179,
+          2197,
+          2185,
+          2194,
+          2170,
+          2176,
+          2176,
+          2182,
+          2191,
+          2182,
+          2182,
+          2176,
+          2191,
+          2167,
+          2176,
+          2173,
+          2200,
+          2185
+        ],
+        "triggers": [
+          {
+            "id": "LLT_14",
+            "description": "PDS at least 3 channels (on Jura side)",
+            "enable": false,
+            "mask": "0xFFF000",
+            "type": "0x1",
+            "count": "0x2"
+          },
+          {
+            "id": "LLT_17",
+            "description": "",
+            "enable": false,
+            "mask": "",
+            "type": "",
+            "count": ""
+          },
+          {
+            "id": "LLT_22",
+            "description": "Spare",
+            "enable": false,
+            "mask": "",
+            "type": "",
+            "count": ""
+          },
+          {
+            "id": "LLT_23",
+            "description": "Spare",
+            "enable": false,
+            "mask": "",
+            "type": "",
+            "count": ""
+          }
+        ]
+      },
+      "crt": {
+        "channel_mask": "0xFFFFFFFF",
+        "pixelate": true,
+        "reshape_length": 63,
+        "delays": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "triggers": [
+          {
+            "id": "LLT_11",
+            "description": "CRT around beam pipe",
+            "enable": true,
+            "mask": "0xF000",
+            "type": "0x1",
+            "count": "0x0"
+          },
+          {
+            "id": "LLT_12",
+            "description": "Any CRT on US Saleve side",
+            "enable": true,
+            "mask": "0x60FC",
+            "type": "0x1",
+            "count": "0x0"
+          },
+          {
+            "id": "LLT_13",
+            "description": "Any CRT on DS Saleve side",
+            "enable": true,
+            "mask": "0x9F030000",
+            "type": "0x1",
+            "count": "0x0"
+          },
+          {
+            "id": "LLT_15",
+            "description": "Any upstream CRT",
+            "enable": true,
+            "mask": "0xFFFF",
+            "type": "0x1",
+            "count": "0x0"
+          },
+          {
+            "id": "LLT_16",
+            "description": "Any downstream CRT",
+            "enable": true,
+            "mask": "0xFFFF0000",
+            "type": "0x1",
+            "count": "0x0"
+          },
+          {
+            "id": "LLT_18",
+            "description": "Any CRT on US Jura side",
+            "enable": true,
+            "mask": "0x9F03",
+            "type": "0x1",
+            "count": "0x0"
+          },
+          {
+            "id": "LLT_19",
+            "description": "Any CRT on DS Jura side",
+            "enable": true,
+            "mask": "0x60FC0000",
+            "type": "0x1",
+            "count": "0x0"
+          },
+          {
+            "id": "LLT_20",
+            "description": "Spare",
+            "enable": false,
+            "mask": "",
+            "type": "",
+            "count": ""
+          },
+          {
+            "id": "LLT_21",
+            "description": "Spare",
+            "enable": false,
+            "mask": "",
+            "type": "",
+            "count": ""
+          }
+        ]
+      },
+      "beam": {
+        "channel_mask": "0xFFFF",
+        "reshape_length": 50,
+        "delays": [
+          1,
+          1,
+          1,
+          0,
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        "triggers": [
+          {
+            "id": "LLT_1",
+            "description": "Beam particle trigger.",
+            "enable": true,
+            "mask": "0x1"
+          },
+          {
+            "id": "LLT_2",
+            "description": "High Pressure Cherenkov (C713)",
+            "enable": true,
+            "mask": "0x8"
+          },
+          {
+            "id": "LLT_3",
+            "description": "Low Pressure Cherenkov (C716)",
+            "enable": true,
+            "mask": "0x10"
+          },
+          {
+            "id": "LLT_4",
+            "description": "Beam on Gate",
+            "enable": true,
+            "mask": "0x2"
+          },
+          {
+            "id": "LLT_5",
+            "description": "Spare",
+            "enable": false,
+            "mask": ""
+          },
+          {
+            "id": "LLT_6",
+            "description": "Beam Gate + ToF + Trigger",
+            "enable": true,
+            "mask": "0x1E3"
+          },
+          {
+            "id": "LLT_7",
+            "description": "HV current limit threshold (init stream)",
+            "enable": true,
+            "mask": "0x200"
+          },
+          {
+            "id": "LLT_8",
+            "description": "Ground plane signals",
+            "enable": true,
+            "mask": "0x400"
+          },
+          {
+            "id": "LLT_9",
+            "description": "Purity monitor",
+            "enable": true,
+            "mask": "0x1000"
+          },
+          {
+            "id": "LLT_10",
+            "description": "Spare",
+            "enable": false,
+            "mask": ""
+          }
+        ]
+      }
+    }
+  }
+}
