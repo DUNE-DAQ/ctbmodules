@@ -160,14 +160,14 @@ CTBModule::do_configure(const data_t&)
   auto session = m_cfg->session();
   // HLTs
   // 0th HLT is random trigger that's not in HLT array
-  if (! misc->get_HLT_trigger()->is_disabled( *session ) ) m_hlt_trigger_counter[0] = 0;
+  if (! misc->get_randomtrigger_1()->is_disabled( *session ) ) m_hlt_trigger_counter[0] = 0;
 
   auto hlts = board->get_HLTs();
   for (const auto& hlt : hlts) { if (! hlt->is_disabled(*session) ) m_hlt_trigger_counter[id_to_idx[hlt->UID()]] = 0; }
 
   // LLTs: Beam and CRT
   // 0th LLT is random trigger that's not in HLT array
-  if (! misc->get_LLT_trigger()->is_disabled( *session ) ) m_llt_trigger_counter[0] = 0;
+  if (! misc->get_randomtrigger_2()->is_disabled( *session ) ) m_llt_trigger_counter[0] = 0;
 
   auto beam_llts = board->get_beam_LLTs();
   for (const auto& llt : beam_llts) { if (! llt->is_disabled(*session)) m_llt_trigger_counter[id_to_idx[llt->UID()]] = 0; }
