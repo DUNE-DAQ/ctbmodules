@@ -51,7 +51,7 @@ def set_beam(db:conffwk.Configuration, beam:dict) -> list[str] :
     board = db.get_dals("CTBoardConf")[0]  
     oks = board.beam
     oks.channel_mask = beam["channel_mask"]
-    oks.reshape_length = beam["reshape_length"]
+    oks.reshape_lengths = beam["reshape_lengths"]
     oks.delays = beam["delays"]
     db.update_dal(oks)
 
@@ -76,7 +76,7 @@ def set_crt(db:conffwk.Configuration, crt:dict) -> list[str] :
     oks = db.get_dals("CTBCRTSubsystem")[0]
     oks.pixelate = crt["pixelate"]
     oks.channel_mask = crt["channel_mask"]
-    oks.reshape_length = crt["reshape_length"]
+    oks.reshape_lengths = crt["reshape_lengths"]
     oks.delays = crt["delays"]
     db.update_dal(oks)
 
@@ -101,7 +101,7 @@ def set_pds(db:conffwk.Configuration, pds:dict) -> None :
     oks = db.get_dals("CTBPDSSubsystem")[0]
     oks.dac_thresholds = pds["dac_thresholds"]
     oks.channel_mask = pds["channel_mask"]
-    oks.reshape_length = pds["reshape_length"]
+    oks.reshape_lengths = pds["reshape_lengths"]
     oks.delays = pds["delays"]
     db.update_dal(oks)
 
