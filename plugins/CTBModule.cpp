@@ -81,7 +81,7 @@ CTBModule::CTBModule(const std::string& name)
 CTBModule::~CTBModule(){
     //check if running. and in case stop the run
   if(m_is_running){
-    const nlohmann::json stopobj;
+    const CommandData_t stopobj;
     do_stop(stopobj);
   } 
   m_control_socket.close() ;
@@ -126,7 +126,7 @@ CTBModule::init(std::shared_ptr<appfwk::ConfigurationManager> cfgMgr)
 }
 
 void
-CTBModule::do_configure(const data_t&)
+CTBModule::do_configure(const CommandData_t&)
 {
 
   TLOG_DEBUG(0) << get_name() << ": Configuring CTB";
@@ -157,7 +157,7 @@ CTBModule::do_configure(const data_t&)
   m_slot = geo_id->get_slot_id();
   
   const auto & misc = board->get_misc();
-  auto session = m_cfg->session();
+  auto session = m_cfg->get_session();
   // HLTs
   // 0th HLT is random trigger that's not in HLT array
   if (! misc->get_randomtrigger_1()->is_disabled( *session ) ) m_hlt_trigger_counter[0] = 0;
@@ -208,7 +208,7 @@ CTBModule::do_configure(const data_t&)
 }
 
 void
-CTBModule::do_start(const nlohmann::json& startobj)
+CTBModule::do_start(const CommandData_t& startobj)
 {
 
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering do_start() method";
@@ -240,7 +240,7 @@ CTBModule::do_start(const nlohmann::json& startobj)
 }
 
 void
-CTBModule::do_stop(const nlohmann::json& /*stopobj*/)
+CTBModule::do_stop(const CommandData_t& /*stopobj*/)
 {
 
   TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering do_stop() method";
