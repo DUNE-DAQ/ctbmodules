@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
-project(ctbmodules VERSION 4.1.0)
+project(ctbmodules VERSION 4.1.1)
 
 find_package(daq-cmake REQUIRED)
 
