@@ -27,7 +27,7 @@ def update_ctb_settings(db_file:Path, jsonfile:Path, session_name:str|None) -> N
         if t not in to_be_included :
             to_be_excluded.append(t)
 
-    print("Enabling:",to_be_included)
+    print("Including:",to_be_included)
     print("Excluding:",to_be_excluded)
 
     if not session_name :
@@ -66,7 +66,7 @@ def set_beam_llts(db:conffwk.Configuration, triggers:dict) -> list[str] :
         oks.mask = t["mask"]
         oks.description = t["description"]
         db.update_dal(oks)
-        if t["include"] :
+        if t["enable"] :
             include.append(t["id"])
     return include
 
@@ -92,7 +92,7 @@ def set_crt_llts(db:conffwk.Configuration, triggers:dict) -> list[str] :
         oks.mask = t["mask"]
         oks.description = t["description"]
         db.update_dal(oks)
-        if t["include"] :
+        if t["enable"] :
             include.append(t["id"])
     return include
         
@@ -113,7 +113,7 @@ def set_pds_llts(db:conffwk.Configuration, triggers:dict) -> None :
         oks = db.get_dal("CTBPDSLLT", t["id"])
         oks.id = t["id"]
         oks.description = t["description"]
-        oks.include = t["include"]
+        oks.enable = t["enable"]
         oks.mask= t["mask"]
         oks.type = t["mask"]
         oks.count = t["count"]
@@ -124,7 +124,7 @@ def set_hlts(db:conffwk.Configuration, hlts:dict) -> list[str] :
     include = []
     for d in hlts :
         set_hlt(db, d)
-        if d["include"] :
+        if d["enable"] :
             include.append(d["id"])
             
     return include
@@ -145,7 +145,7 @@ def set_misc(db:conffwk.Configuration, misc:dict) -> list[str] :
 
     pulser = misc["pulser"]
     oks_pulser = oks_misc.pulser
-    oks_pulser.include = pulser["include"]
+    oks_pulser.enable = pulser["enable"]
     oks_pulser.frequency = pulser["frequency"]
     db.update_dal(oks_pulser)
 
@@ -171,7 +171,7 @@ def set_random_trigger(db:conffwk.Configuration, trigger_id:str, trigger:dict) -
     oks_trigger.description=trigger["description"]
     db.update_dal(oks_trigger)
         
-    if trigger["include"] :
+    if trigger["enable"] :
         return [trigger_id]
     return []
     
@@ -188,13 +188,13 @@ def set_sockets(db:conffwk.Configuration, sockets:dict) -> None :
     
     oks_monitor = oks_sockets.monitor
     monitor = sockets["monitor"]
-    oks_monitor.include = monitor["include"]
+    oks_monitor.enable = monitor["enable"]
     oks_monitor.port = monitor["port"]
     db.update_dal(oks_monitor)
     
     oks_statistics = oks_sockets.statistics
     stat = sockets["statistics"]
-    oks_statistics.include= stat["include"]
+    oks_statistics.enable= stat["enable"]
     oks_statistics.port = stat["port"]
     oks_statistics.updt_period = stat["updt_period"]
     db.update_dal(oks_statistics)
