@@ -2,7 +2,7 @@ from pathlib import Path
 import json
 
 import conffwk
-import daqconf.enable as enable
+import daqconf.include as include
 
 def update_ctb_settings(db_file:Path, jsonfile:Path, session_name:str|None) -> None :
     print (f"Setting {db_file} to {jsonfile}")
@@ -13,38 +13,38 @@ def update_ctb_settings(db_file:Path, jsonfile:Path, session_name:str|None) -> N
     db = conffwk.Configuration('oksconflibs:' + db_file)
     set_sockets(db, ctb["sockets"])
 
-    ## object to be enabled to be return in a list
-    to_be_enabled = set_misc( db, ctb["misc"])
-    to_be_enabled += set_hlts( db, ctb["HLT"]["trigger"])  ## Remember that the HLT block contains other parts which are not stored in our schema, so they are not configurable
-    to_be_enabled += set_subsystems( db, ctb["subsystems"])
+    ## object to be included to be return in a list
+    to_be_included = set_misc( db, ctb["misc"])
+    to_be_included += set_hlts( db, ctb["HLT"]["trigger"])  ## Remember that the HLT block contains other parts which are not stored in our schema, so they are not configurable
+    to_be_included += set_subsystems( db, ctb["subsystems"])
 
     db.commit()
     
     triggers = db.get_dals("CTBTrigger")
     all_triggers = [t.id for t in triggers]
-    to_be_disabled = []
+    to_be_excluded = []
     for t in all_triggers :
-        if t not in to_be_enabled :
-            to_be_disabled.append(t)
+        if t not in to_be_included :
+            to_be_excluded.append(t)
 
-    print("Enabling:",to_be_enabled)
-    print("Disabling:",to_be_disabled)
+    print("Including:",to_be_included)
+    print("Excluding:",to_be_excluded)
 
     if not session_name :
         session_name = db.get_dals("Session")[0].id
         
-    enable.enable(db_file, False, to_be_enabled, session_name)
-    enable.enable(db_file, True, to_be_disabled, session_name)
+    include.include(db_file, False, to_be_included, session_name)
+    include.include(db_file, True, to_be_excluded, session_name)
 
 
 def set_subsystems(db:conffwk.Configuration, systems:dict) -> list[str] :
 
     set_pds(db, systems["pds"])
 
-    enable = []
-    enable += set_crt(db, systems["crt"])
-    enable += set_beam(db, systems["beam"])
-    return enable
+    include = []
+    include += set_crt(db, systems["crt"])
+    include += set_beam(db, systems["beam"])
+    return include
 
 def set_beam(db:conffwk.Configuration, beam:dict) -> list[str] :
 
@@ -60,15 +60,15 @@ def set_beam(db:conffwk.Configuration, beam:dict) -> list[str] :
 
 def set_beam_llts(db:conffwk.Configuration, triggers:dict) -> list[str] :
 
-    enable = []
+    include = []
     for t in triggers :
         oks = db.get_dal("CTBLLT", t["id"])
         oks.mask = t["mask"]
         oks.description = t["description"]
         db.update_dal(oks)
         if t["enable"] :
-            enable.append(t["id"])
-    return enable
+            include.append(t["id"])
+    return include
 
 
 def set_crt(db:conffwk.Configuration, crt:dict) -> list[str] :
@@ -84,7 +84,7 @@ def set_crt(db:conffwk.Configuration, crt:dict) -> list[str] :
     
 def set_crt_llts(db:conffwk.Configuration, triggers:dict) -> list[str] :
 
-    enable = []
+    include = []
     for t in triggers :
         oks = db.get_dal("CTBCountLLT", t["id"])
         oks.count = t["count"]
@@ -93,8 +93,8 @@ def set_crt_llts(db:conffwk.Configuration, triggers:dict) -> list[str] :
         oks.description = t["description"]
         db.update_dal(oks)
         if t["enable"] :
-            enable.append(t["id"])
-    return enable
+            include.append(t["id"])
+    return include
         
 
 def set_pds(db:conffwk.Configuration, pds:dict) -> None :
@@ -121,13 +121,13 @@ def set_pds_llts(db:conffwk.Configuration, triggers:dict) -> None :
     
 def set_hlts(db:conffwk.Configuration, hlts:dict) -> list[str] :
 
-    enable = []
+    include = []
     for d in hlts :
         set_hlt(db, d)
         if d["enable"] :
-            enable.append(d["id"])
+            include.append(d["id"])
             
-    return enable
+    return include
 
 def set_hlt(db:conffwk.Configuration, hlt:dict) -> None :
     oks = db.get_dal("CTBHLT", hlt["id"])
@@ -157,11 +157,11 @@ def set_misc(db:conffwk.Configuration, misc:dict) -> list[str] :
 
     db.update_dal(oks_timing)
 
-    to_be_enabled = []
-    to_be_enabled += set_random_trigger(db, "HLT_0", misc["randomtrigger_1"])
-    to_be_enabled += set_random_trigger(db, "LLT_0", misc["randomtrigger_2"])
+    to_be_included = []
+    to_be_included += set_random_trigger(db, "HLT_0", misc["randomtrigger_1"])
+    to_be_included += set_random_trigger(db, "LLT_0", misc["randomtrigger_2"])
 
-    return to_be_enabled
+    return to_be_included
 
 def set_random_trigger(db:conffwk.Configuration, trigger_id:str, trigger:dict) -> list[str] :
     oks_trigger=db.get_dal("CTBRandomTrigger", trigger_id)
