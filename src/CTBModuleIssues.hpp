@@ -19,37 +19,26 @@
 namespace dunedaq {
 
 // Disable coverage collection LCOV_EXCL_START
-ERS_DECLARE_ISSUE(ctbmodules, 
-                  CTBCommunicationError, 
-                  " CTB Hardware Communication Error: " << descriptor, 
+ERS_DECLARE_ISSUE(ctbmodules,
+                  CTBCommunicationError,
+                  " CTB Hardware Communication Error: " << descriptor,
                   ((std::string)descriptor))
 
-ERS_DECLARE_ISSUE(ctbmodules, 
-                  CTBBufferWarning, 
-                  " CTB Buffer Issue: " << descriptor, 
-                  ((std::string)descriptor))
+ERS_DECLARE_ISSUE(ctbmodules, CTBBufferWarning, " CTB Buffer Issue: " << descriptor, ((std::string)descriptor))
 
-ERS_DECLARE_ISSUE(ctbmodules, 
-                  CTBWordMatchWarning, 
-                  " CTB Word Matching Issue: " << descriptor, 
-                  ((std::string)descriptor))
-
-ERS_DECLARE_ISSUE(ctbmodules, 
-                  CTBRepeatedTimestampWarning, 
-                  " CTB Repeated Word Issue: " << descriptor, 
+ERS_DECLARE_ISSUE(ctbmodules,
+                  CTBWordMatchWarning,
+                  " CTB Word Matching Issue: " << descriptor,
                   ((std::string)descriptor))
 
 ERS_DECLARE_ISSUE(ctbmodules,
-                  CTBMessage,
-                  " Mesage from CTB: " << descriptor,
+                  CTBRepeatedTimestampWarning,
+                  " CTB Repeated Word Issue: " << descriptor,
                   ((std::string)descriptor))
 
-ERS_DECLARE_ISSUE(ctbmodules,
-                  CTBConfigFailure,
-		  descriptor,
-                  ((std::string)descriptor))
+ERS_DECLARE_ISSUE(ctbmodules, CTBMessage, " Mesage from CTB: " << descriptor, ((std::string)descriptor))
 
-
+ERS_DECLARE_ISSUE(ctbmodules, CTBConfigFailure, descriptor, ((std::string)descriptor))
 
 // Re-enable coverage collection LCOV_EXCL_STOP
 
